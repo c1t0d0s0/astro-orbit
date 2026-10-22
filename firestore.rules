@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// 記録は users/{uid} の下に、人ごとに分けて保存する。
+//   users/{uid}                                その人の情報 (全アプリ共通)
+//   users/{uid}/apps/{appId}                   アプリごとの記録のまとめ
+//   users/{uid}/apps/{appId}/progress/{itemId} 教材 1 つごとの途中経過
+// 読み書きできるのは、ログインしている本人だけ。
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

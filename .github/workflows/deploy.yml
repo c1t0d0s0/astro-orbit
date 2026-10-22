@@ -1,0 +1,53 @@
+# main ブランチに push されたら、テスト・ビルドをして GitHub Pages に公開する
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Actions の画面から手動でも実行できるようにする
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 公開中のデプロイは途中で止めず、待っている古い実行だけを取り消す
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # リポジトリの変数 GTM_ID があれば、その ID で Google のタグを埋め込む (なければ埋め込まない)
+      - run: npm run build
+        env:
+          GTM_ID: ${{ vars.GTM_ID }}
+          # 4 つとも登録してあれば、Google ログインと Firestore への保存が使えるようになる (なければ今までどおり)
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
