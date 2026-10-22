@@ -12,5 +12,6 @@ export const VIEW_ICON: Record<ViewId, string> = {
   ground: svg(`<path class="i-dome" d="M4 36A20 20 0 0 1 44 36"/><path class="i-path" d="M9 36Q24 4 39 36"/><circle class="i-sun" cx="24" cy="15" r="3.6"/><line class="i-ground" x1="2" y1="36" x2="46" y2="36"/>`),
   polar: svg(`${earth(24, 26, 15, 23)}<g transform="rotate(23 24 26)"><ellipse class="i-arctic" cx="24" cy="12.2" rx="6" ry="1.6"/></g><path class="i-night" d="M24 11A15 15 0 0 1 24 41A9 15 0 0 0 24 11Z" transform="rotate(23 24 26)"/>`),
   moon: svg(`${earth(24, 24, 5)}<circle class="i-orbit" cx="24" cy="24" r="15"/><circle class="i-moon" cx="39" cy="24" r="3.4"/><path class="i-night" d="M39 20.6A3.4 3.4 0 0 0 39 27.4Z"/><circle class="i-moon" cx="9" cy="24" r="3.4"/><path class="i-night" d="M9 20.6A3.4 3.4 0 0 0 9 27.4Z"/>`),
+  eclipse: svg(`<circle class="i-sun" cx="10" cy="24" r="7"/><path class="i-shadow" d="M34 18L47 21V27L34 30Z"/>${earth(34, 24, 6)}<circle class="i-moon-dark" cx="22" cy="24" r="2.6"/>`),
   tide: svg(`<ellipse class="i-sea" cx="20" cy="24" rx="15" ry="11"/>${earth(20, 24, 8)}<circle class="i-moon" cx="43" cy="24" r="3"/>`),
 };

@@ -3,6 +3,7 @@ import { getSettings, markSeen, saveSettings } from '../core/storage';
 import { placeById, type NamedPlace } from '../data/places';
 import { resolveWhen, type Guide } from '../guides';
 import { Stage } from '../three/stage';
+import { EclipseView } from '../views/eclipse';
 import { GroundView } from '../views/ground';
 import { MoonView } from '../views/moon';
 import { SpaceView } from '../views/space';
@@ -17,7 +18,8 @@ import { VIEWS } from './text';
 
 // 3D の画面。「3D で見る」(自由に操作) と「解説」(ステップごとに、時刻・場所・視点を切りかえる) の両方で使う
 
-export type Target = { view: ViewId } | { guide: Guide };
+/** step は、はじめに見せる解説のステップ (0 から) */
+export type Target = { view: ViewId } | { guide: Guide; step?: number };
 
 /** 説明のレベルを切りかえたときなどに、同じ状態でかき直すための情報 */
 interface Resume {
@@ -44,6 +46,8 @@ function makeView(stage: Stage, id: ViewId): View {
       return new MoonView(stage);
     case 'tide':
       return new TideView(stage);
+    case 'eclipse':
+      return new EclipseView(stage);
     default:
       return new SpaceView(stage, id);
   }
@@ -71,7 +75,7 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   const cameraBar = h('div', { class: 'camera-bar', role: 'group', 'aria-label': '視点' });
   const stageNote = h('p', { class: 'stage-note' });
   // 地球の上の赤い点 (観察地点) の名前。点といっしょに回ると速いときに読めないので、画面のすみに固定して出す
-  const legend = h('p', { class: 'stage-legend' });
+  const legend = h('p', { class: 'stage-legend', hidden: true });
   const guideBox = h('section', { class: 'guide-box', 'aria-live': 'polite' });
   const toggleBox = h('div', { class: 'toggles', role: 'group', 'aria-label': '表示の切りかえ' });
   const infoBox = h('div', { class: 'info' });
@@ -103,7 +107,7 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   let view: View | null = null;
   let viewId: ViewId = firstView;
   const ctx: ViewContext = { place, detail: settings.detail, options: {} };
-  let stepIndex = resume?.step ?? 0;
+  let stepIndex = resume?.step ?? ('guide' in target ? (target.step ?? 0) : 0);
 
   const bar = timebar({ clock, tz: () => place.tz, span: VIEWS[firstView].span });
 
@@ -149,7 +153,13 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
     viewId = id;
     ctx.options = { ...view.defaults, ...options };
     title.innerHTML = rubyHtml(guide ? guide.title : VIEWS[id].title);
-    stageNote.innerHTML = rubyHtml(id === 'ground' ? 'ドラッグで回す・見回す' : '大(おお)きさと距離(きょり)は、見(み)やすく縮(ちぢ)めています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)');
+    stageNote.innerHTML = rubyHtml(
+      id === 'ground'
+        ? 'ドラッグで回す・見回す'
+        : id === 'eclipse'
+          ? '地球(ちきゅう)・月(つき)の大(おお)きさと、月(つき)の通(とお)り道(みち)のかたむきを強調(きょうちょう)しているので、この画面(がめん)では食(しょく)が本当(ほんとう)より長(なが)く続(つづ)きます。時刻(じこく)は「いまのようす」で'
+          : '大(おお)きさと距離(きょり)は、見(み)やすく縮(ちぢ)めています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
+    );
     drawToggles();
   }
 
@@ -181,7 +191,10 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
     infoTimer = setTimeout(drawInfo, wait);
   }
   const unsubscribe = clock.subscribe(refresh);
-  const offFrame = stage.onFrame((dt) => clock.tick(dt));
+  const offFrame = stage.onFrame((dt) => {
+    clock.tick(dt);
+    view?.frame?.(dt);
+  });
 
   function setPlace(p: NamedPlace): void {
     place = p;

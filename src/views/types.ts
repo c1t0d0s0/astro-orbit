@@ -1,6 +1,6 @@
 import type { NamedPlace } from '../data/places';
 
-export type ViewId = 'space' | 'seasons' | 'polar' | 'ground' | 'moon' | 'tide';
+export type ViewId = 'space' | 'seasons' | 'polar' | 'ground' | 'moon' | 'tide' | 'eclipse';
 
 /** 表示の切りかえ (ボタン 1 つ) */
 export interface Toggle {

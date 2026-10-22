@@ -1,4 +1,5 @@
 import { localSiderealTime, toHorizontal } from '../astro/coords';
+import { eclipseAt, nextEclipse, sunCovered, topocentricMoon, type Eclipse, type EclipseType } from '../astro/eclipse';
 import { dayInfo, moonAge, moonRiseSet, nextPhase, type MoonPhase } from '../astro/events';
 import { bodiesAt } from '../astro/state';
 import { tideName, tideRange } from '../astro/tide';
@@ -40,8 +41,54 @@ const deg = (v: number) => `${Math.round(v)}°`;
 function skyNow(ms: number, ctx: ViewContext) {
   const b = bodiesAt(ms);
   const lst = localSiderealTime(b.gmst, ctx.place.lon);
-  return { b, sun: toHorizontal(b.sun, ctx.place.lat, lst), moon: toHorizontal(b.moon, ctx.place.lat, lst) };
+  // 月は、観察地点から見た位置 (視差で 1° ほど低く見える)
+  return { b, lst, sun: toHorizontal(b.sun, ctx.place.lat, lst), moon: toHorizontal(topocentricMoon(b, ctx.place.lat, lst), ctx.place.lat, lst) };
 }
+
+const SOLAR_NAME: Record<EclipseType, string> = {
+  total: '皆既日食(かいきにっしょく)',
+  annular: '金環日食(きんかんにっしょく)',
+  partial: '部分日食(ぶぶんにっしょく)',
+  penumbral: '部分日食(ぶぶんにっしょく)',
+};
+const LUNAR_NAME: Record<EclipseType, string> = {
+  total: '皆既月食(かいきげっしょく)',
+  annular: '皆既月食(かいきげっしょく)',
+  partial: '部分月食(ぶぶんげっしょく)',
+  penumbral: '半影月食(はんえいげっしょく)',
+};
+
+/** 次の日食・月食 (探すのに少し時間がかかるので、同じ日のあいだは前の結果を使う) */
+const eclipseCache = new Map<string, Eclipse>();
+function nextOf(ms: number, kind: 'solar' | 'lunar'): Eclipse {
+  const key = `${kind}:${Math.floor(ms / 86_400_000)}`;
+  let e = eclipseCache.get(key);
+  if (!e || e.ms <= ms) {
+    e = nextEclipse(ms, kind);
+    eclipseCache.set(key, e);
+  }
+  return e;
+}
+
+function eclipseRows(ms: number, tz: number): Row[] {
+  const solar = nextOf(ms, 'solar');
+  const lunar = nextOf(ms, 'lunar');
+  const nowSolar = eclipseAt(ms, 'solar');
+  const nowLunar = eclipseAt(ms, 'lunar');
+  const now = nowSolar
+    ? `日食(にっしょく)が起(お)きている (地球(ちきゅう)のどこかで${SOLAR_NAME[nowSolar]})`
+    : nowLunar && nowLunar !== 'penumbral'
+      ? `${LUNAR_NAME[nowLunar]}が起(お)きている`
+      : '食(しょく)は起(お)きていない';
+  const fmt = (e: Eclipse, names: Record<EclipseType, string>) => `${dateTimeLabel(e.ms, tz).date} ${dateTimeLabel(e.ms, tz).time}ごろ ${names[e.type]}`;
+  return [
+    ['いま', now],
+    ['つぎの日食(にっしょく)', `${fmt(solar, SOLAR_NAME)} (見(み)える場所(ばしょ)はかぎられる)`],
+    ['つぎの月食(げっしょく)', `${fmt(lunar, LUNAR_NAME)} (月(つき)が出(で)ている場所(ばしょ)ならどこでも見(み)える)`],
+  ];
+}
+
+const latLabel = (lat: number) => (Math.abs(lat) < 0.05 ? '赤道(せきどう) (0°)' : lat > 0 ? `北緯(ほくい) ${lat.toFixed(1)}°` : `南緯(なんい) ${(-lat).toFixed(1)}°`);
 
 /** 太陽の高さ・昼の長さ (白夜・極夜もふくめて) */
 function dayRows(ms: number, ctx: ViewContext, notilt = false): Row[] {
@@ -80,7 +127,7 @@ function nextPhases(ms: number, tz: number): Row {
 
 export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
   const { place } = ctx;
-  const { b, sun, moon } = skyNow(ms, ctx);
+  const { b, sun, moon, lst } = skyNow(ms, ctx);
   const south = place.lat < 0;
   const where = place.name;
   switch (view) {
@@ -104,7 +151,12 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
     }
     case 'polar':
       return (
-        rows([['観察(かんさつ)地点(ちてん)', `${where} (緯度(いど) ${place.lat.toFixed(1)}°)`], ['いまの太陽(たいよう)の高(たか)さ', deg(sun.alt)], ...dayRows(ms, ctx)]) +
+        rows([
+          ['観察(かんさつ)地点(ちてん)', `${where} (緯度(いど) ${place.lat.toFixed(1)}°)`],
+          ['いまの太陽(たいよう)の高(たか)さ', deg(sun.alt)],
+          ...dayRows(ms, ctx),
+          ['太陽(たいよう)が真上(まうえ)に来(く)る緯度(いど)', latLabel(b.sun.dec)],
+        ]) +
         figure(`${where}の昼(ひる)の長(なが)さ (1年(ねん))`, daylightChart(place, ms))
       );
     case 'ground':
@@ -116,9 +168,16 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
           ...dayRows(ms, ctx),
           ['月(つき)', moon.alt > -1 ? `${direction(moon.az)}の空(そら)、高(たか)さ ${deg(moon.alt)}` : '地平線(ちへいせん)の下(した)'],
           ...moonRows(ms, ctx),
+          ...groundEclipse(ms, ctx, lst, sun.alt, moon.alt),
         ]) +
         figure('いまの太陽(たいよう)の光(ひかり)の当(あ)たり方(かた)', beamChart(sun.alt))
       );
+    case 'eclipse':
+      return rows([
+        ['月(つき)の形(かたち)', phaseName(b.phase)],
+        ['月(つき)の黄道(こうどう)からのずれ', `${b.moon.lat >= 0 ? '北' : '南'}へ ${Math.abs(b.moon.lat).toFixed(1)}° (画面(がめん)では5倍(ばい)にかいています)`],
+        ...eclipseRows(ms, place.tz),
+      ]);
     case 'moon':
       return rows([...moonRows(ms, ctx), nextPhases(ms, place.tz)]);
     case 'tide': {
@@ -137,6 +196,16 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
       );
     }
   }
+}
+
+/** 地上から見た日食・月食 (起きているときだけ) */
+function groundEclipse(ms: number, ctx: ViewContext, lst: number, sunAlt: number, moonAlt: number): Row[] {
+  const out: Row[] = [];
+  const covered = sunAlt > -1 ? sunCovered(ms, ctx.place.lat, lst) : 0;
+  if (covered > 0.001) out.push(['日食(にっしょく)', `太陽(たいよう)の ${Math.round(covered * 100)}% がかくれている`]);
+  const lunar = eclipseAt(ms, 'lunar');
+  if (lunar && moonAlt > -1) out.push(['月食(げっしょく)', `${LUNAR_NAME[lunar]}のとちゅう`]);
+  return out;
 }
 
 /** 日付と時刻の表示 (タイムバーの上) */

@@ -1165,3 +1165,15 @@ rt {
   border-radius: 50%;
   background: #ff5a4e;
 }
+
+.stage-label.is-tropic {
+  color: #ffb26b;
+}
+.i-shadow {
+  fill: rgba(5, 8, 15, 0.8);
+}
+.i-moon-dark {
+  fill: #3a3f4e;
+  stroke: #d8d2c0;
+  stroke-width: 0.8;
+}

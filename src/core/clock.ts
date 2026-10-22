@@ -11,6 +11,7 @@ export interface Speed {
 
 export const SPEEDS: readonly Speed[] = [
   { key: 'real', label: 'ふつう', ms: 1000 },
+  { key: 'min1', label: '1秒(びょう)で1分(ぷん)', ms: 60_000 },
   { key: 'min', label: '1秒(びょう)で10分(ぷん)', ms: 600_000 },
   { key: 'hour', label: '1秒(びょう)で1時間(じかん)', ms: 3_600_000 },
   { key: 'qday', label: '1秒(びょう)で6時間(じかん)', ms: DAY_MS / 4 },

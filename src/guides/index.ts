@@ -1,15 +1,17 @@
 import { nextPhase, seasonPoint } from '../astro/events';
+import { eclipse } from './eclipse';
 import { moon } from './moon';
 import { polar } from './polar';
 import { seasons } from './seasons';
 import { stars } from './stars';
 import { sunpath } from './sunpath';
 import { tide } from './tide';
+import { tropics } from './tropics';
 import type { Guide, When } from './types';
 
 export type { Guide, Step, When } from './types';
 
-export const GUIDES: readonly Guide[] = [seasons, sunpath, polar, moon, stars, tide];
+export const GUIDES: readonly Guide[] = [seasons, sunpath, tropics, polar, moon, eclipse, stars, tide];
 
 export const guideById = (id: string) => GUIDES.find((g) => g.id === id);
 
@@ -23,8 +25,10 @@ function atHour(ms: number, hour: number, tz: number): number {
 export function resolveWhen(when: When, now: number, tz: number): number {
   const year = new Date(now + tz * 3_600_000).getUTCFullYear();
   if ('season' in when) return atHour(seasonPoint(year, when.season), when.hour, tz);
+  if ('now' in when) return now;
+  if ('at' in when) return Date.parse(`${when.at}:00Z`);
   if ('phase' in when) {
-    const t = nextPhase(now, when.phase);
+    const t = nextPhase(when.after ? Date.parse(`${when.after}T00:00:00Z`) : now, when.phase);
     return when.hour === undefined ? t : atHour(t, when.hour, tz);
   }
   return Date.UTC(year, when.month - 1, when.day, when.hour) - tz * 3_600_000;

@@ -8,7 +8,8 @@ import { VIEWS } from '../src/ui/text';
 const TOGGLES: Record<string, string[]> = {
   space: ['labels', 'moonPath', 'place'],
   seasons: ['ghosts', 'notilt', 'place', 'labels'],
-  polar: ['circles', 'place', 'labels'],
+  polar: ['circles', 'tropics', 'subsolar', 'place', 'labels'],
+  eclipse: ['shadows', 'plane', 'nodes', 'labels'],
   ground: ['sunPath', 'seasonPaths', 'moonPath', 'stars', 'daystars', 'lines', 'trails', 'pole'],
   moon: ['ghosts', 'inset', 'south', 'labels'],
   tide: ['moonForce', 'sunForce', 'arrows', 'place', 'labels'],
@@ -17,7 +18,8 @@ const CAMERAS: Record<string, string[]> = {
   space: ['whole', 'top', 'earth'],
   seasons: ['whole', 'side', 'top', 'earth'],
   polar: ['side', 'north', 'south', 'sun'],
-  ground: ['outside', 'south', 'north', 'east', 'west', 'up'],
+  ground: ['outside', 'south', 'north', 'east', 'west', 'up', 'sunTrack', 'moonTrack'],
+  eclipse: ['tilt', 'side', 'top', 'earth'],
   moon: ['top', 'tilt'],
   tide: ['top', 'tilt', 'far'],
 };

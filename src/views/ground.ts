@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { equatorialVector, localSiderealTime } from '../astro/coords';
+import { coveredFraction, sizes, topocentricMoon } from '../astro/eclipse';
 import { localMidnight, seasonPoint, type SeasonPoint } from '../astro/events';
 import { cos, sin } from '../astro/math';
 import { bodiesAt } from '../astro/state';
@@ -8,7 +9,8 @@ import { CONSTELLATIONS, STARS, starByName } from '../data/sky';
 import { COLORS, circle, polyline } from '../three/bodies';
 import { skyMatrix } from '../three/frames';
 import type { Stage } from '../three/stage';
-import { glowTexture, moonTexture } from '../three/textures';
+import { moonMaterial } from '../three/moonShader';
+import { glowTexture } from '../three/textures';
 import type { CameraPreset, Toggle, View, ViewContext } from './types';
 
 // 地上から見た空。観察地点を中心にした「透明半球」を外からながめるか、中に立って見上げる。
@@ -42,7 +44,14 @@ const CAMERAS: CameraPreset[] = [
   { key: 'east', label: '東(ひがし)を見(み)る' },
   { key: 'west', label: '西(にし)を見(み)る' },
   { key: 'up', label: '真上(まうえ)を見(み)る' },
+  { key: 'sunTrack', label: '太陽(たいよう)を追(お)う (ズーム)' },
+  { key: 'moonTrack', label: '月(つき)を追(お)う (ズーム)' },
 ];
+
+/** 追いかけるときの視野 (°)。この視野では、太陽と月を本当の大きさでかく */
+const TRACK_FOV = 2.6;
+/** 月は太陽より少し手前にかく (日食で、月が太陽の前に来るように) */
+const MOON_AT = 0.98;
 
 /** 空の色 (太陽の高度で変わる) */
 function skyColor(alt: number, out: THREE.Color): THREE.Color {
@@ -90,31 +99,6 @@ function starColor(bv: number): THREE.Color {
   return new THREE.Color().setHSL(0.6 - t * 0.55, 0.55 + t * 0.2, 0.86 - t * 0.12);
 }
 
-/** 月の満ち欠けを、太陽の向きから計算してぬる材質 */
-function moonMaterial(): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    uniforms: { sunDir: { value: new THREE.Vector3(1, 0, 0) }, map: { value: moonTexture() } },
-    vertexShader: `
-      varying vec3 vNormal;
-      varying vec2 vUv;
-      void main() {
-        vNormal = normalize(mat3(modelMatrix) * normal);
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }`,
-    fragmentShader: `
-      uniform vec3 sunDir;
-      uniform sampler2D map;
-      varying vec3 vNormal;
-      varying vec2 vUv;
-      void main() {
-        float lit = smoothstep(-0.04, 0.06, dot(normalize(vNormal), sunDir));
-        vec3 tex = texture2D(map, vUv).rgb;
-        gl_FragColor = vec4(mix(tex * 0.12 + vec3(0.04, 0.05, 0.09), tex * 1.15, lit), 1.0);
-      }`,
-  });
-}
-
 export class GroundView implements View {
   readonly id = 'ground' as const;
   readonly toggles = TOGGLES;
@@ -149,6 +133,12 @@ export class GroundView implements View {
   private readonly person: THREE.Group;
   private readonly skyColor = new THREE.Color();
   private inside = false;
+  /** 太陽か月を追いかけているか */
+  private track: 'sun' | 'moon' | null = null;
+  private readonly sunBall: THREE.Mesh;
+  private readonly glow: THREE.Sprite;
+  /** 日食で太陽がかくれている割合 (0〜1)。info に出す */
+  covered = 0;
   private pathKey = '';
   private seasonKey = '';
   private moonKey = '';
@@ -268,13 +258,13 @@ export class GroundView implements View {
     root.add(this.celestial);
 
     // 太陽と月
-    const sunBall = new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 16), new THREE.MeshBasicMaterial({ color: 0xffe07a }));
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false }));
-    glow.scale.setScalar(2.4);
-    this.sun.add(sunBall, glow);
+    // 大きさは update で決める (半径 1 の球を拡大する)
+    this.sunBall = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.MeshBasicMaterial({ color: 0xffe07a }));
+    this.glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false }));
+    this.sun.add(this.sunBall, this.glow);
     root.add(this.sun);
     this.moonMat = moonMaterial();
-    this.moon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 48, 24).rotateY(-Math.PI / 2), this.moonMat);
+    this.moon = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32).rotateY(-Math.PI / 2), this.moonMat);
     root.add(this.moon);
 
     root.add(this.paths, this.sunPath, this.moonPath, this.trails);
@@ -284,7 +274,10 @@ export class GroundView implements View {
   /** 赤道座標の向きを地上の画面の向きにする行列 (時刻・場所ごと) */
   private matrix = new THREE.Matrix4();
 
+  private last: { ms: number; ctx: ViewContext } | null = null;
+
   update(ms: number, ctx: ViewContext): void {
+    this.last = { ms, ctx };
     const b = bodiesAt(ms);
     const o = ctx.options;
     const { lat, lon } = ctx.place;
@@ -294,24 +287,49 @@ export class GroundView implements View {
     this.celestial.matrixWorldNeedsUpdate = true;
 
     const sunDir = new THREE.Vector3(...equatorialVector(b.sun)).applyMatrix4(this.matrix);
-    const moonDir = new THREE.Vector3(...equatorialVector(b.moon)).applyMatrix4(this.matrix);
+    // 月は近いので、地球の中心から見た向き (geo) と、観察地点から見た向き (moonDir) が 1° ほどちがう
+    const geoMoon = new THREE.Vector3(...equatorialVector(b.moon)).applyMatrix4(this.matrix);
+    const topo = topocentricMoon(b, lat, lst);
+    const moonDir = new THREE.Vector3(...equatorialVector(topo)).applyMatrix4(this.matrix);
     const sunAlt = Math.asin(sunDir.y) / (Math.PI / 180);
+
+    // 太陽と月は、本当の見かけの大きさを k 倍してかく (追いかけてズームしたときは本当の大きさ)
+    const z = sizes(b);
+    const moonSemi = (z.moon * b.moon.dist) / topo.dist;
+    const k = this.magnify();
+    const rad = Math.PI / 180;
     this.sun.position.copy(sunDir).multiplyScalar(R);
-    this.moon.position.copy(moonDir).multiplyScalar(R);
+    this.sunBall.scale.setScalar(R * Math.tan(z.sun * k * rad));
+    this.glow.scale.setScalar(R * Math.tan(z.sun * k * rad) * 5.5);
+    this.moon.position.copy(moonDir).multiplyScalar(R * MOON_AT);
+    this.moon.scale.setScalar(R * MOON_AT * Math.tan(moonSemi * k * rad));
     this.moon.lookAt(0, 0, 0);
-    this.moonMat.uniforms.sunDir.value.copy(sunDir);
+    const u = this.moonMat.uniforms;
+    u.sunDir.value.copy(sunDir);
+    u.center.value.copy(moonDir);
+    u.geo.value.copy(geoMoon);
+    u.axis.value.copy(sunDir).negate();
+    u.umbra.value = z.umbra * rad;
+    u.penumbra.value = z.penumbra * rad;
+    u.k.value = k;
+
+    // 日食: 太陽がかくれた割合。皆既に近づくと空が暗くなり、星が見える
+    const sep = Math.acos(Math.max(-1, Math.min(1, sunDir.dot(moonDir)))) / rad;
+    this.covered = sunAlt > -1 ? coveredFraction(z.sun, moonSemi, sep) : 0;
+    const eclipseDark = this.covered < 0.8 ? this.covered * 0.12 : 0.1 + ((this.covered - 0.8) / 0.2) * 0.85;
+    if (this.track) this.aim(this.track === 'sun' ? sunDir : moonDir);
     // 地面の下にあるときは、外から見るときだけうすく見せる
     this.sun.visible = sunDir.y > -0.02 || !this.inside;
     this.moon.visible = moonDir.y > -0.02 || !this.inside;
 
     // 空の明るさと星
-    skyColor(sunAlt, this.skyColor);
+    skyColor(sunAlt, this.skyColor).lerp(new THREE.Color(0x0b1630), Math.min(1, eclipseDark));
     this.stage.background.copy(this.inside ? this.skyColor : this.skyColor.clone().lerp(new THREE.Color(0x0b1630), 0.55));
     (this.dome.material as THREE.MeshBasicMaterial).opacity = this.inside ? 0 : 0.08;
     // 夜は地面も暗くする
-    const light = Math.max(0, Math.min(1, (sunAlt + 8) / 14));
+    const light = Math.max(0, Math.min(1, (sunAlt + 8) / 14)) * (1 - eclipseDark);
     this.ground.material.color.setHex(0x5f8a4e).multiplyScalar(0.3 + 0.7 * light);
-    const dark = Math.max(0, Math.min(1, (-sunAlt - 2) / 10));
+    const dark = Math.max(0, Math.min(1, (-sunAlt - 2) / 10), this.covered > 0.97 ? eclipseDark : 0);
     const starOpacity = o.daystars ? 1 : dark;
     this.stars.visible = o.stars !== false && starOpacity > 0.01;
     this.starMat.uniforms.opacity.value = starOpacity;
@@ -361,8 +379,9 @@ export class GroundView implements View {
     const m = new THREE.Matrix4();
     for (let t = day; t <= day + DAY; t += 10 * 60_000) {
       const b = bodiesAt(t);
-      skyMatrix(lat, localSiderealTime(b.gmst, lon), m);
-      pts.push(new THREE.Vector3(...equatorialVector(body === 'sun' ? b.sun : b.moon)).applyMatrix4(m).multiplyScalar(R));
+      const lst = localSiderealTime(b.gmst, lon);
+      skyMatrix(lat, lst, m);
+      pts.push(new THREE.Vector3(...equatorialVector(body === 'sun' ? b.sun : topocentricMoon(b, lat, lst))).applyMatrix4(m).multiplyScalar(R * (body === 'sun' ? 1 : MOON_AT)));
     }
     return pts;
   }
@@ -431,9 +450,22 @@ export class GroundView implements View {
     group.clear();
   }
 
+  /** 太陽・月を何倍の大きさでかくか。視野がせまい (ズームしている) ほど本当の大きさに近づける */
+  private magnify(): number {
+    return Math.max(1, Math.min(12, this.stage.camera.fov / 6));
+  }
+
+  /** 追いかけている天体のほうへ、カメラを向ける */
+  private aim(dir: THREE.Vector3): void {
+    const controls = this.stage.controls;
+    controls.target.copy(this.stage.camera.position).addScaledVector(dir, 0.01);
+    controls.update();
+  }
+
   setCamera(key: string, ctx: ViewContext): void {
     const cam = this.stage.camera;
     const controls = this.stage.controls;
+    this.track = key === 'sunTrack' ? 'sun' : key === 'moonTrack' ? 'moon' : null;
     if (key === 'outside') {
       this.inside = false;
       cam.fov = 45;
@@ -452,9 +484,10 @@ export class GroundView implements View {
     } else {
       // 地面に立って見上げる。カメラのすぐ前に回転の中心を置き、ドラッグで見回す
       this.inside = true;
-      cam.fov = 70;
+      cam.fov = this.track ? TRACK_FOV : 70;
       const dir = { south: [0, 0.35, 1], north: [0, 0.35, -1], east: [1, 0.35, 0], west: [-1, 0.35, 0], up: [0.001, 1, 0.12] }[key] ?? [0, 0.35, 1];
-      const eye = new THREE.Vector3(0, 0.3, 0);
+      // 追いかけてズームするときは、目の高さのずれも見えてしまうので、太陽・月の位置の中心 (原点) から見る
+      const eye = new THREE.Vector3(0, this.track ? 0.001 : 0.3, 0);
       controls.target.copy(eye).add(new THREE.Vector3(...dir).normalize().multiplyScalar(0.01));
       cam.position.copy(eye);
       controls.minDistance = 0.01;
@@ -468,6 +501,8 @@ export class GroundView implements View {
     }
     cam.updateProjectionMatrix();
     controls.update();
+    // 大きさと向きを、新しい視野に合わせてかき直す
+    if (this.last) this.update(this.last.ms, this.last.ctx);
     this.stage.invalidate();
   }
 }

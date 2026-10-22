@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { SEASON_LON, type SeasonPoint } from '../astro/events';
+import { cos, sin } from '../astro/math';
 import { bodiesAt } from '../astro/state';
-import { COLORS, axisLine, circle, earthMesh, latitudeRing, moonMesh, polyline, sunMesh } from '../three/bodies';
-import { earthQuaternion, eclLonLat, onGlobe } from '../three/frames';
+import { COLORS, arrow, axisLine, circle, earthMesh, latitudeRing, moonMesh, polyline, sunMesh } from '../three/bodies';
+import { earthQuaternion, eclLonLat, eqToScene, onGlobe } from '../three/frames';
 import type { Stage } from '../three/stage';
 import type { CameraPreset, Toggle, View, ViewContext, ViewId } from './types';
 
@@ -21,6 +22,8 @@ const SUN_R = 2.2;
 const DAY = 86_400_000;
 /** 北極圏・南極圏の緯度 */
 export const ARCTIC = 66.56;
+/** 北回帰線・南回帰線の緯度 (地軸のかたむきと同じ) */
+export const TROPIC = 23.44;
 
 const SEASON_LABEL: Record<SeasonPoint, string> = {
   spring: '春分(しゅんぶん)',
@@ -46,6 +49,8 @@ const TOGGLES: Record<Mode, Toggle[]> = {
   ],
   polar: [
     { key: 'circles', label: '北極圏(ほっきょくけん)・南極圏(なんきょくけん)' },
+    { key: 'tropics', label: '北回帰線(きたかいきせん)・南回帰線(みなみかいきせん)' },
+    { key: 'subsolar', label: '太陽(たいよう)が真上(まうえ)に来(く)る地点(ちてん)' },
     { key: 'place', label: '観察(かんさつ)地点(ちてん)' },
     { key: 'labels', label: '名前(なまえ)' },
   ],
@@ -74,7 +79,7 @@ const CAMERAS: Record<Mode, CameraPreset[]> = {
 const DEFAULTS: Record<Mode, Record<string, boolean>> = {
   space: { labels: true, moonPath: true, place: true },
   seasons: { ghosts: true, notilt: false, place: true, labels: true },
-  polar: { circles: true, place: true, labels: true },
+  polar: { circles: true, tropics: false, subsolar: false, place: true, labels: true },
 };
 
 export class SpaceView implements View {
@@ -90,7 +95,13 @@ export class SpaceView implements View {
   private readonly pin: THREE.Mesh;
   private readonly ghosts = new THREE.Group();
   private readonly circles = new THREE.Group();
+  private readonly tropics = new THREE.Group();
+  /** 太陽が真上に来る地点 (太陽光線が地面に垂直に当たる地点) */
+  private readonly subsolar = new THREE.Group();
   private readonly labels: CSS2DObject[] = [];
+  private readonly tropicLabels = new THREE.Group();
+  private subsolarDot: THREE.Mesh | null = null;
+  private lastEps = 23.44;
   private follow: Follow = 'none';
   private readonly lastEarth = new THREE.Vector3();
   private lastAngle = 0;
@@ -129,15 +140,25 @@ export class SpaceView implements View {
     }
     this.earth.add(latitudeRing(0, EARTH_R * 1.005, COLORS.equator, { opacity: 0.6 }));
     this.circles.add(latitudeRing(ARCTIC, EARTH_R * 1.006, COLORS.arctic), latitudeRing(-ARCTIC, EARTH_R * 1.006, COLORS.arctic));
-    this.circles.add(latitudeRing(23.44, EARTH_R * 1.006, COLORS.tropic, { opacity: 0.7 }), latitudeRing(-23.44, EARTH_R * 1.006, COLORS.tropic, { opacity: 0.7 }));
+    this.tropics.add(latitudeRing(TROPIC, EARTH_R * 1.006, COLORS.tropic), latitudeRing(-TROPIC, EARTH_R * 1.006, COLORS.tropic));
     if (mode === 'polar') {
       this.addLabel(this.circles, '北極圏(ほっきょくけん)', new THREE.Vector3(0.4, EARTH_R * 0.93, 0), 'is-small is-arctic');
       this.addLabel(this.circles, '南極圏(なんきょくけん)', new THREE.Vector3(0.4, -EARTH_R * 0.93, 0), 'is-small is-arctic');
+      // 名前は、地球といっしょに回らないよう、地軸のかたむきだけをつけた入れ物の上に置く (setTropicLabels)
+      this.addLabel(this.tropicLabels, '北回帰線(きたかいきせん)', new THREE.Vector3(), 'is-small is-tropic');
+      this.addLabel(this.tropicLabels, '赤道(せきどう)', new THREE.Vector3(), 'is-small');
+      this.addLabel(this.tropicLabels, '南回帰線(みなみかいきせん)', new THREE.Vector3(), 'is-small is-tropic');
+      // 太陽が真上に来る地点と、そこにまっすぐ当たる太陽の光
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 8), new THREE.MeshBasicMaterial({ color: 0xffe36e }));
+      const ray = arrow(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(EARTH_R * 2.2, 0, 0), EARTH_R * 1.15, 0xffe36e, 0.16);
+      this.subsolarDot = dot;
+      this.subsolar.add(dot, ray);
+      this.addLabel(this.subsolar, '太陽(たいよう)が真上(まうえ)', new THREE.Vector3(EARTH_R * 2.3, 0.18, 0), 'is-small is-sun');
     }
-    this.earth.add(this.circles);
+    this.earth.add(this.circles, this.tropics);
     this.pin = new THREE.Mesh(new THREE.SphereGeometry(mode === 'polar' ? 0.045 : 0.07, 16, 8), new THREE.MeshBasicMaterial({ color: COLORS.place }));
     this.earth.add(this.pin);
-    this.earthGroup.add(this.earth);
+    this.earthGroup.add(this.earth, this.tropicLabels, this.subsolar);
     if (mode !== 'polar') this.addLabel(this.earthGroup, '地球(ちきゅう)', new THREE.Vector3(0, -EARTH_R * 1.9, 0));
     root.add(this.earthGroup);
 
@@ -186,6 +207,18 @@ export class SpaceView implements View {
     this.pin.visible = o.place !== false;
     onGlobe(ctx.place.lat, ctx.place.lon, this.pin.position).multiplyScalar(EARTH_R);
     this.circles.visible = this.mode === 'polar' ? o.circles !== false : false;
+    this.tropics.visible = this.mode === 'polar' && !!o.tropics;
+    this.tropicLabels.visible = this.tropics.visible;
+    this.lastEps = b.eps;
+    if (this.tropics.visible) this.setTropicLabels(b.eps, earthPos);
+    this.subsolar.visible = this.mode === 'polar' && !!o.subsolar;
+    if (this.subsolar.visible) {
+      // 太陽が真上に来る地点は、緯度が太陽の赤緯、経度が「太陽の赤経 − 恒星時」の場所。地球の外 (自転しない入れ物) に置き、
+      // 光の矢印をその地点に向ける
+      const toSun = earthPos.clone().negate().normalize();
+      this.subsolar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), toSun);
+      this.subsolarDot!.position.set(EARTH_R * 1.01, 0, 0);
+    }
 
     // 月
     if (this.mode === 'space') {
@@ -204,6 +237,28 @@ export class SpaceView implements View {
 
     for (const l of this.labels) l.visible = o.labels !== false;
     this.stage.invalidate();
+  }
+
+  /** カメラを回したときも、回帰線の名前を地球の左はしに置きなおす */
+  frame(): void {
+    if (this.tropics.visible) this.setTropicLabels(this.lastEps, this.lastEarth);
+  }
+
+  /**
+   * 赤道・回帰線の名前を、カメラから見て地球の左はしの、それぞれの緯度の高さに置く (地球が回っても動かない)
+   */
+  private setTropicLabels(eps: number, earthPos: THREE.Vector3): void {
+    const north = eqToScene([0, 0, 1], eps);
+    const view = this.stage.camera.position.clone().sub(earthPos).normalize();
+    // カメラから見た地球の左はし (地軸と視線の両方に直角な向き)
+    const left = new THREE.Vector3().crossVectors(view, north).normalize();
+    if (left.lengthSq() < 0.5) left.set(1, 0, 0);
+    const lats = [TROPIC, 0, -TROPIC];
+    this.tropicLabels.children.forEach((l, i) => {
+      const lat = lats[i];
+      l.position.copy(north).multiplyScalar(EARTH_R * sin(lat)).addScaledVector(left, -EARTH_R * cos(lat) * 1.02);
+      (l as CSS2DObject).center.set(1, 0.5);
+    });
   }
 
   /** 前後 2 週間の月の位置をつないだ線 (地球から見た月の通り道) */

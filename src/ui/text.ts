@@ -48,6 +48,13 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
     speed: 'qday',
     camera: 'top',
   },
+  eclipse: {
+    title: '日食(にっしょく)と月食(げっしょく)',
+    lead: '太陽(たいよう)・地球(ちきゅう)・月(つき)が一直線(いっちょくせん)にならぶと、月(つき)や地球(ちきゅう)の影(かげ)が落(お)ちて、日食(にっしょく)や月食(げっしょく)が起(お)こります。',
+    span: 'month',
+    speed: 'qday',
+    camera: 'tilt',
+  },
   tide: {
     title: '潮(しお)の満(み)ち引(ひ)き',
     lead: '海(うみ)の水(みず)は、月(つき)と太陽(たいよう)に引(ひ)かれて、地球(ちきゅう)の2か所(しょ)でふくらみます。',
@@ -57,7 +64,7 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
   },
 };
 
-export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'tide'];
+export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide'];
 
 export const SPAN_LABEL: Record<Span, string> = { day: '1日(にち)', month: '1か月(げつ)', year: '1年(ねん)' };
 

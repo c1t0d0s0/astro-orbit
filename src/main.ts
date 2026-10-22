@@ -32,9 +32,14 @@ function route(): void {
   const hash = location.hash;
   let m: RegExpMatchArray | null;
 
-  // #/view/<画面> 3D で自由に見る / #/guide/<解説> 解説
+  // #/view/<画面> 3D で自由に見る / #/guide/<解説>[/<ステップ>] 解説
   if ((m = hash.match(/^#\/view\/([a-z]+)$/)) && isView(m[1])) void viewer({ view: m[1] }, id);
-  else if ((m = hash.match(/^#\/guide\/([a-z0-9-]+)$/)) && guideById(m[1])) void viewer({ guide: guideById(m[1])! }, id);
+  else if ((m = hash.match(/^#\/guide\/([a-z0-9-]+)(?:\/(\d+))?$/)) && guideById(m[1])) {
+    const guide = guideById(m[1])!;
+    // #/guide/<解説>/<ステップ> (1 から) で、とちゅうのステップから見せる
+    const step = Math.min(Math.max(Number(m[2] ?? 1), 1), guide.steps.length) - 1;
+    void viewer({ guide, step }, id);
+  }
   else {
     renderHome(app);
     window.scrollTo(0, 0);
