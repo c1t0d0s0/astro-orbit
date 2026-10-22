@@ -88,7 +88,6 @@ export class SpaceView implements View {
   private readonly moon: THREE.Mesh;
   private readonly moonPath = new THREE.Group();
   private readonly pin: THREE.Mesh;
-  private readonly pinLabel: CSS2DObject;
   private readonly ghosts = new THREE.Group();
   private readonly circles = new THREE.Group();
   private readonly labels: CSS2DObject[] = [];
@@ -137,9 +136,6 @@ export class SpaceView implements View {
     }
     this.earth.add(this.circles);
     this.pin = new THREE.Mesh(new THREE.SphereGeometry(mode === 'polar' ? 0.045 : 0.07, 16, 8), new THREE.MeshBasicMaterial({ color: COLORS.place }));
-    this.pinLabel = stage.label('', 'is-place');
-    this.pinLabel.center.set(0, 1.2);
-    this.pin.add(this.pinLabel);
     this.earth.add(this.pin);
     this.earthGroup.add(this.earth);
     if (mode !== 'polar') this.addLabel(this.earthGroup, '地球(ちきゅう)', new THREE.Vector3(0, -EARTH_R * 1.9, 0));
@@ -189,7 +185,6 @@ export class SpaceView implements View {
     // 観察地点
     this.pin.visible = o.place !== false;
     onGlobe(ctx.place.lat, ctx.place.lon, this.pin.position).multiplyScalar(EARTH_R);
-    this.stage.setLabelText(this.pinLabel, ctx.place.name.replace(/ \(.*\)$/, ''));
     this.circles.visible = this.mode === 'polar' ? o.circles !== false : false;
 
     // 月

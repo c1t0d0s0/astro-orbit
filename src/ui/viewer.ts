@@ -70,6 +70,8 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   const stageEl = h('div', { class: 'stage' });
   const cameraBar = h('div', { class: 'camera-bar', role: 'group', 'aria-label': '視点' });
   const stageNote = h('p', { class: 'stage-note' });
+  // 地球の上の赤い点 (観察地点) の名前。点といっしょに回ると速いときに読めないので、画面のすみに固定して出す
+  const legend = h('p', { class: 'stage-legend' });
   const guideBox = h('section', { class: 'guide-box', 'aria-live': 'polite' });
   const toggleBox = h('div', { class: 'toggles', role: 'group', 'aria-label': '表示の切りかえ' });
   const infoBox = h('div', { class: 'info' });
@@ -82,7 +84,7 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
       'main',
       { class: 'viewer' },
       h('header', { class: 'bar viewer-bar' }, homeButton(), title, levelBtn),
-      h('div', { class: 'viewer-body' }, h('section', { class: 'stage-area', 'aria-label': '3D の画面' }, stageEl, cameraBar, stageNote), panel),
+      h('div', { class: 'viewer-body' }, h('section', { class: 'stage-area', 'aria-label': '3D の画面' }, stageEl, h('div', { class: 'stage-top' }, cameraBar, legend), stageNote), panel),
     ),
   );
 
@@ -159,7 +161,20 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
     infoAt = performance.now();
     infoBox.innerHTML = infoHtml(viewId, clock.ms, ctx);
   }
+  let legendHtml = '';
+  function drawLegend(): void {
+    // 地上の画面には赤い点がない。表示を切りかえて点を消したときも出さない
+    const show = viewId !== 'ground' && ctx.options.place !== false;
+    const html = show ? `<span class="legend-dot" aria-hidden="true"></span>${rubyHtml(`赤(あか)い点(てん)：${ctx.place.name}`)}` : '';
+    if (html !== legendHtml) {
+      legendHtml = html;
+      legend.innerHTML = html;
+      legend.hidden = !show;
+    }
+  }
+
   function refresh(): void {
+    drawLegend();
     view?.update(clock.ms, ctx);
     if (infoTimer) return;
     const wait = Math.max(0, 250 - (performance.now() - infoAt));

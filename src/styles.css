@@ -733,11 +733,19 @@ rt {
   text-align: center;
 }
 
-.camera-bar {
+/* 視点のボタンと、その下の赤い点の名前 (ボタンが 2 行になっても重ならない) */
+.stage-top {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
   right: 0.5rem;
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+  pointer-events: none;
+}
+
+.camera-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
@@ -791,9 +799,6 @@ rt {
   font-size: 0.6875rem;
 }
 
-.stage-label.is-place {
-  background: rgba(255, 90, 78, 0.85);
-}
 
 .stage-label.is-season {
   background: rgba(106, 168, 147, 0.85);
@@ -1130,4 +1135,33 @@ rt {
 
 .stage-caption[hidden] {
   display: none;
+}
+
+/* 観察地点 (地球の上の赤い点) の名前。カメラのボタンの下に固定して出す */
+.stage-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.1rem 0.6rem 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(11, 22, 48, 0.72);
+  color: #fdfdfa;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+.stage-legend[hidden] {
+  display: none;
+}
+
+.legend-dot {
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #ff5a4e;
 }
