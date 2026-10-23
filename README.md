@@ -2,7 +2,7 @@
 
 宇宙・空・海・大地のしくみを 3D で見る、小学 4 年生から中学 3 年生向けの地学シミュレーターです。地球・月・太陽の動き (天体) に加えて、雲・雨・雪・雷・竜巻・台風・虹 (気象)、川・海流 (陸水・海洋)、地震・火山・津波 (固体地球)、オーロラ (超高層大気) を見られます。時間を進めたり戻したりしながら、教科書の文章や 2 次元の図だけではわかりにくい現象を、ぐるっと回して目でたしかめます。ブラウザだけで、PC・タブレット・スマートフォンのどれでも使えます。
 
-(もとは「天体ビューア」という名前でした。記録の保存先の名前 `astro-orbit` は、いままでの記録が消えないようにそのまま使っています)
+(もとは「天体ビューア」という名前でした)
 
 問題を解くアプリではないので、今日のチャレンジ・スタンプ・カードはありません。見た目と柴犬のハカセ、Google ログインのしくみは [理科ラボ](../science-lab) と同じです。
 
@@ -76,15 +76,15 @@ GitHub Pages に公開するときは、リポジトリの変数 `GTM_ID` に ID
 | 最後まで見た解説 | 両方を合わせる (同じものは、はじめて見た時刻) |
 
 - 画面はいつも手元 (localStorage) の記録を読み書きし (`src/core/storage.ts`)、ログイン中は書きかわった分を少しまとめて Firestore に送ります (`src/cloud/sync.ts`)。合わせ方は何回やっても同じ結果になります
-- 手元の記録は人ごとに分けます。ログインなしは `astro-orbit:v1:…`、ログイン中の人の写しは `astro-orbit:u:<uid>:…`。ログアウトすると、その人の写しは端末から消します
+- 手元の記録は人ごとに分けます。ログインなしは `geoscience-viewer:v1:…`、ログイン中の人の写しは `geoscience-viewer:u:<uid>:…`。ログアウトすると、その人の写しは端末から消します
 
 ### Firestore の形
 
-記録は `users/{uid}/apps/astro-orbit` に入ります。理科ラボなどと同じ Firebase プロジェクトを使っても、記録はまざりません。ルールは `firestore.rules` にあります (読み書きできるのはログインしている本人だけ)。
+記録は `users/{uid}/apps/geoscience-viewer` に入ります。理科ラボなどと同じ Firebase プロジェクトを使っても、記録はまざりません。ルールは `firestore.rules` にあります (読み書きできるのはログインしている本人だけ)。
 
 ```
 users/{uid}                        その人の情報 (全アプリ共通)。名前・メールアドレスは保存しない
-users/{uid}/apps/astro-orbit       記録のまとめ
+users/{uid}/apps/geoscience-viewer       記録のまとめ
   completed: string[]              最後まで見た解説 (seasons, tide など)
   settings:  { seen: { seasons: 1792650000000 },   解説を最後まで見た時刻
                place: { id, name, lat, lon, tz },  観察する場所
@@ -104,8 +104,8 @@ users/{uid}/apps/astro-orbit       記録のまとめ
 ### エミュレーターで動かす (開発用)
 
 ```sh
-npx firebase-tools emulators:start --only auth,firestore --project demo-astro-orbit
-FIREBASE_API_KEY=x FIREBASE_AUTH_DOMAIN=localhost FIREBASE_PROJECT_ID=demo-astro-orbit FIREBASE_APP_ID=x FIREBASE_EMULATOR=1 npm run dev
+npx firebase-tools emulators:start --only auth,firestore --project demo-geoscience-viewer
+FIREBASE_API_KEY=x FIREBASE_AUTH_DOMAIN=localhost FIREBASE_PROJECT_ID=demo-geoscience-viewer FIREBASE_APP_ID=x FIREBASE_EMULATOR=1 npm run dev
 ```
 
 ブラウザのコンソールで `window.__testUser = 'kid1'` としてからログインのボタンをおします。

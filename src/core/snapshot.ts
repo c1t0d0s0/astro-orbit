@@ -32,10 +32,10 @@ export const hasRecords = (s: Snapshot) => s.settings !== null || Object.keys(s.
 //   users/{uid}                  その人の情報 (全アプリ共通)。名前やメールアドレスは入れない
 //   users/{uid}/apps/{appId}     アプリごとの記録のまとめ (AppDoc)
 //
-// このアプリの appId は "astro-orbit"。ほかのアプリと同じ Firebase プロジェクトを使っても、記録はまざらない。
+// このアプリの appId は "geoscience-viewer"。ほかのアプリと同じ Firebase プロジェクトを使っても、記録はまざらない。
 
 export const SCHEMA = 1;
-export const APP_ID = 'astro-orbit';
+export const APP_ID = 'geoscience-viewer';
 
 export interface AppDoc {
   schema: number;

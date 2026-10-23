@@ -3,10 +3,10 @@ import { defaultSettings, emptySnapshot, validSeen, validSettings, type Settings
 
 // 記録を置く場所。ログインしていない人の記録は GUEST_PREFIX の下。
 // ログイン中の人の記録 (Firestore の写し) は、人ごとに別の場所に置き、ログアウトしたら消す。
-const GUEST_PREFIX = 'astro-orbit:v1:';
-const USER_PREFIX = 'astro-orbit:u:';
+const GUEST_PREFIX = 'geoscience-viewer:v1:';
+const USER_PREFIX = 'geoscience-viewer:u:';
 const userPrefix = (uid: string) => `${USER_PREFIX}${uid}:`;
-const ACTIVE_UID_KEY = 'astro-orbit:auth-uid';
+const ACTIVE_UID_KEY = 'geoscience-viewer:auth-uid';
 
 let prefix = GUEST_PREFIX;
 let listener: ((key: string) => void) | null = null;

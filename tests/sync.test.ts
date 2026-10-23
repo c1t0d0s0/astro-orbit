@@ -149,6 +149,6 @@ describe('ログインと同期', () => {
     await settle();
     expect(rememberedUid()).toBeNull();
     expect(exportSnapshot()).toEqual(emptySnapshot());
-    expect([...memory.current.keys()].some((k) => k.startsWith('astro-orbit:u:'))).toBe(false);
+    expect([...memory.current.keys()].some((k) => k.startsWith('geoscience-viewer:u:'))).toBe(false);
   });
 });

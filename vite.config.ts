@@ -90,7 +90,7 @@ function googleTags(id: string): HtmlTagDescriptor[] {
 
 function googleTagPlugin(id: string): Plugin {
   return {
-    name: 'astro-orbit-google-tag',
+    name: 'geoscience-viewer-google-tag',
     // 図の一覧のページ (gallery.html。開発サーバーでだけ見られる) にはタグを入れない
     transformIndexHtml: (_html, ctx) => (id && ctx.filename.endsWith('index.html') ? googleTags(id) : []),
   };
