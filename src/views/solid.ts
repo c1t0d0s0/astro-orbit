@@ -28,6 +28,18 @@ export const STATIONS: [string, number, number][] = [
 export const stationDistance = (i: number) => new THREE.Vector3(STATIONS[i][1], 0.12, STATIONS[i][2]).distanceTo(HYPO) * KM;
 /** プレートの境目の上の面 (海溝 x=4 から西へ 30° でしずむ) */
 const slabTop = (x: number) => (x >= 4 ? -0.35 : -0.35 - (4 - x) * Math.tan(Math.PI / 6));
+/** 海のプレートの厚さのまん中を、東のはし (s=0) から s だけ進んだ点 [x, y] と傾き (rad) */
+const SLAB_FLAT = BLOCK.x - 4;
+const SLAB_LEN = SLAB_FLAT + 9.5;
+function slabMid(s: number): [number, number, number] {
+  if (s < SLAB_FLAT) return [BLOCK.x - s, -0.95, 0];
+  const u = s - SLAB_FLAT;
+  const a = Math.PI / 6;
+  return [4 - u * Math.cos(a) + 0.6 * Math.sin(a), -0.35 - u * Math.sin(a) - 0.6 * Math.cos(a), a];
+}
+/** プレートの動きの目印の間かく・進む速さ (はじまりからの 1 秒で。本当は 1 年に数 cm なので、ずっと速くしている) */
+const MARK_GAP = 1;
+const MARK_SPEED = 0.4;
 
 const QUAKE_TOGGLES: Toggle[] = [
   { key: 'pWave', label: 'P波(は) (はじめの小(ちい)さなゆれ)' },
@@ -59,6 +71,7 @@ export class QuakeView implements View {
   private readonly stations: THREE.Mesh[] = [];
   private readonly stationGroup = new THREE.Group();
   private readonly plateGroup = new THREE.Group();
+  private readonly plateMarks: THREE.Mesh[] = [];
 
   constructor(private readonly stage: Stage) {
     const root = stage.root;
@@ -143,6 +156,14 @@ export class QuakeView implements View {
     const down = new THREE.Vector3(-Math.cos(Math.PI / 6), -Math.sin(Math.PI / 6), 0);
     this.plateGroup.add(arrow(down, new THREE.Vector3(0, slabTop(0) - 0.6, Z + 0.3), 2.6, 0xffffff, 0.45));
     this.labels.add(this.plateGroup, '1年(ねん)に数(すう)cm', [9, 0.5, Z + 0.3], 'is-small');
+    // 海のプレートの断面の目印。再生すると、しずみこむ向きに流れていく
+    const markGeo = new THREE.BoxGeometry(0.1, 0.9, 0.04);
+    const markMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
+    for (let i = 0; i < Math.floor(SLAB_LEN / MARK_GAP); i++) {
+      const m = new THREE.Mesh(markGeo, markMat);
+      this.plateMarks.push(m);
+      this.plateGroup.add(m);
+    }
     root.add(this.plateGroup);
 
     stage.controls.minDistance = 6;
@@ -176,6 +197,12 @@ export class QuakeView implements View {
       m.position.y = 0.4 + (t >= arrival(d, VP) && t < arrival(d, VS) + 30 ? 0.04 * Math.sin(t * 40 + i) : 0);
     });
     this.plateGroup.visible = !!o.plates;
+    const shift = (t * MARK_SPEED) % MARK_GAP;
+    this.plateMarks.forEach((m, i) => {
+      const [x, y, a] = slabMid(i * MARK_GAP + shift);
+      m.position.set(x, y, BLOCK.z + 0.03);
+      m.rotation.z = a;
+    });
     this.labels.show(o.labels !== false);
     this.stage.invalidate();
   }

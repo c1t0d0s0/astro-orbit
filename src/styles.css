@@ -1008,8 +1008,10 @@ rt {
   gap: 0.35rem;
 }
 
+/* ▶ と ❚❚ で幅が変わると、となりの速さのメニューが折り返したりもどったりするので、幅を決めておく */
 .btn-play {
-  min-width: 3.5rem;
+  width: 3.75rem;
+  padding: 0;
 }
 
 .timebar [hidden],
