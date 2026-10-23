@@ -3,25 +3,20 @@ import { eclipseAt, nextEclipse, sunCovered, topocentricMoon, type Eclipse, type
 import { dayInfo, moonAge, moonRiseSet, nextPhase, type MoonPhase } from '../astro/events';
 import { bodiesAt } from '../astro/state';
 import { tideName, tideRange } from '../astro/tide';
+import { auroraSky, geomagLat, ovalGap } from '../earth/aurora';
 import type { ViewContext, ViewId } from '../views/types';
 import { beamChart, daylightChart, tideChart } from './chart';
 import { h, rubyHtml } from './dom';
+import { earthInfoHtml } from './infoEarth';
+import { figure, rows, type Row } from './infoRows';
 import { dateTimeLabel, direction, hoursLabel, phaseName, seasonName, shortDate, timeLabel } from './text';
 
 // 画面ごとの「いまのようす」(数字とグラフ)。時刻が変わるたびに書きなおす (再生中は 1 秒に数回まで)
 
-type Row = [label: string, value: string];
 
 const TIDE_LABEL = { spring: '大潮(おおしお)', middle: '中潮(なかしお)', neap: '小潮(こしお)' };
 const PHASE_LABEL: Record<MoonPhase, string> = { new: '新月(しんげつ)', first: '上弦(じょうげん)', full: '満月(まんげつ)', last: '下弦(かげん)' };
 
-function rows(list: Row[]): string {
-  return `<dl class="info-rows">${list.map(([k, v]) => `<div><dt>${rubyHtml(k)}</dt><dd>${rubyHtml(v)}</dd></div>`).join('')}</dl>`;
-}
-
-function figure(title: string, svg: string, note = ''): string {
-  return `<figure class="info-fig"><figcaption>${rubyHtml(title)}</figcaption>${svg}${note ? `<p class="info-note">${rubyHtml(note)}</p>` : ''}</figure>`;
-}
 
 /** 春分・夏至・冬至の通り道の色 (views/ground.ts の COLORS と同じ) */
 const LEGEND =
@@ -126,6 +121,8 @@ function nextPhases(ms: number, tz: number): Row {
 }
 
 export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
+  const earth = earthInfoHtml(view, ms, ctx);
+  if (earth !== null) return earth;
   const { place } = ctx;
   const { b, sun, moon, lst } = skyNow(ms, ctx);
   const south = place.lat < 0;
@@ -169,6 +166,7 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
           ['月(つき)', moon.alt > -1 ? `${direction(moon.az)}の空(そら)、高(たか)さ ${deg(moon.alt)}` : '地平線(ちへいせん)の下(した)'],
           ...moonRows(ms, ctx),
           ...groundEclipse(ms, ctx, lst, sun.alt, moon.alt),
+          ...(ctx.options.aurora ? [auroraRow(ctx, sun.alt)] : []),
         ]) +
         figure('いまの太陽(たいよう)の光(ひかり)の当(あ)たり方(かた)', beamChart(sun.alt))
       );
@@ -195,7 +193,18 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
         )
       );
     }
+     default:
+      return '';
   }
+}
+
+/** 地上から見たオーロラ (表示の切りかえ「オーロラ」が入っているとき) */
+function auroraRow(ctx: ViewContext, sunAlt: number): Row {
+  const m = geomagLat(ctx.place.lat, ctx.place.lon);
+  const sky = auroraSky(m, sunAlt, false);
+  const toward = m >= 0 === ovalGap(m, false) > 0 ? '北(きた)' : '南(みなみ)';
+  const where = sky === 'overhead' ? '頭(あたま)の上(うえ)の空(そら)に見(み)える' : sky === 'low' ? `${toward}の低(ひく)い空(そら)に見(み)える` : sunAlt > -10 ? '空(そら)が明(あか)るくて見(み)えない' : 'この場所(ばしょ)からは見(み)えない (オーロラの輪(わ)から遠(とお)い)';
+  return ['オーロラ', `${where} (地磁気緯度(ちじききど) ${Math.abs(m).toFixed(0)}°)`];
 }
 
 /** 地上から見た日食・月食 (起きているときだけ) */

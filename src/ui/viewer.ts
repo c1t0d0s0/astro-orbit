@@ -3,18 +3,23 @@ import { getSettings, markSeen, saveSettings } from '../core/storage';
 import { placeById, type NamedPlace } from '../data/places';
 import { resolveWhen, type Guide } from '../guides';
 import { Stage } from '../three/stage';
+import { AuroraView } from '../views/aurora';
 import { EclipseView } from '../views/eclipse';
 import { GroundView } from '../views/ground';
 import { MoonView } from '../views/moon';
+import { RainbowView } from '../views/rainbow';
+import { QuakeView, TsunamiView, VolcanoView } from '../views/solid';
 import { SpaceView } from '../views/space';
 import { TideView } from '../views/tide';
+import { CurrentView, RiverView } from '../views/water';
+import { CloudView, StormView, TyphoonView } from '../views/weather';
 import type { View, ViewContext, ViewId } from '../views/types';
 import { h, homeButton, plain, rubyHtml, setRuby } from './dom';
 import { infoHtml } from './info';
 import { placePicker } from './place';
 import { guide as shibaGuide } from './shiba';
 import { timebar } from './timebar';
-import { VIEWS } from './text';
+import { DEFAULT_NOTE, VIEWS } from './text';
 
 // 3D の画面。「3D で見る」(自由に操作) と「解説」(ステップごとに、時刻・場所・視点を切りかえる) の両方で使う
 
@@ -48,6 +53,26 @@ function makeView(stage: Stage, id: ViewId): View {
       return new TideView(stage);
     case 'eclipse':
       return new EclipseView(stage);
+    case 'cloud':
+      return new CloudView(stage);
+    case 'storm':
+      return new StormView(stage);
+    case 'typhoon':
+      return new TyphoonView(stage);
+    case 'rainbow':
+      return new RainbowView(stage);
+    case 'river':
+      return new RiverView(stage);
+    case 'current':
+      return new CurrentView(stage);
+    case 'quake':
+      return new QuakeView(stage);
+    case 'tsunami':
+      return new TsunamiView(stage);
+    case 'volcano':
+      return new VolcanoView(stage);
+    case 'aurora':
+      return new AuroraView(stage);
     default:
       return new SpaceView(stage, id);
   }
@@ -106,6 +131,8 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   let place: NamedPlace = settings.place;
   let view: View | null = null;
   let viewId: ViewId = firstView;
+  /** いまの時計が、現象の時間 (はじまりからの ms) か。はじめは日時 */
+  let processClock = false;
   const ctx: ViewContext = { place, detail: settings.detail, options: {} };
   let stepIndex = resume?.step ?? ('guide' in target ? (target.step ?? 0) : 0);
 
@@ -152,14 +179,20 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
     view = makeView(stage, id);
     viewId = id;
     ctx.options = { ...view.defaults, ...options };
-    title.innerHTML = rubyHtml(guide ? guide.title : VIEWS[id].title);
-    stageNote.innerHTML = rubyHtml(
-      id === 'ground'
-        ? 'ドラッグで回す・見回す'
-        : id === 'eclipse'
-          ? '地球(ちきゅう)・月(つき)の大(おお)きさと、月(つき)の通(とお)り道(みち)のかたむきを強調(きょうちょう)しているので、この画面(がめん)では食(しょく)が本当(ほんとう)より長(なが)く続(つづ)きます。時刻(じこく)は「いまのようす」で'
-          : '大(おお)きさと距離(きょり)は、見(み)やすく縮(ちぢ)めています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
-    );
+    const meta = VIEWS[id];
+    title.innerHTML = rubyHtml(guide ? guide.title : meta.title);
+    stageNote.innerHTML = rubyHtml(meta.note ?? DEFAULT_NOTE);
+    // 日時の画面と現象の時間の画面を行き来したら、時計をそれぞれのはじめにもどす
+    const process = !!meta.timeline;
+    clock.range = meta.timeline ? [0, meta.timeline.length] : null;
+    if (process !== processClock) {
+      processClock = process;
+      clock.setPlaying(false);
+      clock.set(process ? 0 : Date.now());
+    }
+    bar.setTimeline(meta.timeline ?? null);
+    // 現象の時間の画面には、観察する場所がない
+    placeBox.hidden = process;
     drawToggles();
   }
 
@@ -173,8 +206,8 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   }
   let legendHtml = '';
   function drawLegend(): void {
-    // 地上の画面には赤い点がない。表示を切りかえて点を消したときも出さない
-    const show = viewId !== 'ground' && ctx.options.place !== false;
+    // 地上・虹の画面と、現象の時間の画面には赤い点がない。表示を切りかえて点を消したときも出さない
+    const show = viewId !== 'ground' && viewId !== 'rainbow' && !VIEWS[viewId].timeline && ctx.options.place !== false;
     const html = show ? `<span class="legend-dot" aria-hidden="true"></span>${rubyHtml(`赤(あか)い点(てん)：${ctx.place.name}`)}` : '';
     if (html !== legendHtml) {
       legendHtml = html;
@@ -310,6 +343,7 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   } else {
     panel.append(...panelColumns([lead, bar.el]));
     startFree(firstView);
+    if (resume) clock.set(resume.ms);
   }
 
   // 説明のレベルを切りかえる。同じステップ・同じ時刻のまま、画面をかき直してもらう (main.ts の route)

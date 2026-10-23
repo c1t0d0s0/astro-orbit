@@ -2,9 +2,10 @@ import { nextPhase, seasonPoint, type MoonPhase, type SeasonPoint } from '../ast
 import { DAY_MS } from '../astro/time';
 import { SPEEDS, spanWindow, speedByKey, type Clock, type Span } from '../core/clock';
 import { h, rubyHtml } from './dom';
-import { SPAN_LABEL, dateTimeLabel } from './text';
+import { SPAN_LABEL, dateTimeLabel, elapsedLabel, elapsedTick, type Timeline } from './text';
 
-// タイムラプスの操作: 日付と時刻、スライダー、再生・一時停止、速さ、範囲 (1 日・1 か月・1 年)、「いま」、ジャンプ
+// タイムラプスの操作: 日付と時刻、スライダー、再生・一時停止、速さ、範囲 (1 日・1 か月・1 年)、「いま」、ジャンプ。
+// 現象の時間の画面では、日付のかわりに「はじまりから何分」を出し、範囲・「いま」・ジャンプはかくす
 
 const SEASON_JUMPS: [SeasonPoint, string][] = [
   ['spring', '春分(しゅんぶん)'],
@@ -33,6 +34,8 @@ export interface TimebarOptions {
 export interface Timebar {
   el: HTMLElement;
   setSpan(span: Span): void;
+  /** 現象の時間にする (null で日時にもどす) */
+  setTimeline(timeline: Timeline | null): void;
   /** 再生中でなければ、画面を時刻に合わせて書きなおす (場所を変えたときなど) */
   refresh(): void;
   dispose(): void;
@@ -48,6 +51,7 @@ export function timebar(opts: TimebarOptions): Timebar {
   const { clock } = opts;
   let span = opts.span;
   let win = spanWindow(clock.ms, span, opts.tz());
+  let timeline: Timeline | null = null;
 
   const date = h('span', { class: 'clock-date' });
   const time = h('span', { class: 'clock-time' });
@@ -57,7 +61,13 @@ export function timebar(opts: TimebarOptions): Timebar {
   const play = h('button', { type: 'button', class: 'btn btn-primary btn-play', 'aria-label': '再生' });
   const fwd = button('▶', { 'aria-label': 'すすむ' });
   const now = button('いま');
-  const speed = h('select', { class: 'select', 'aria-label': '速さ' }, ...SPEEDS.map((s) => h('option', { value: s.key }, s.label.replace(/\(([ぁ-ん]+)\)/g, ''))));
+  const speed = h('select', { class: 'select', 'aria-label': '速さ' });
+  function drawSpeeds(): void {
+    const list = timeline ? SPEEDS.filter((s) => timeline!.speeds.includes(s.key)) : SPEEDS;
+    speed.replaceChildren(...list.map((s) => h('option', { value: s.key }, s.label.replace(/\(([ぁ-ん]+)\)/g, ''))));
+    speed.value = clock.speed.key;
+  }
+  drawSpeeds();
   const spans = h('div', { class: 'seg', role: 'group', 'aria-label': 'スライダーの範囲' });
   const spanButtons = (['day', 'month', 'year'] as Span[]).map((s) => {
     const b = button(SPAN_LABEL[s]);
@@ -92,6 +102,20 @@ export function timebar(opts: TimebarOptions): Timebar {
     clock.set(ms);
   }
 
+  /** 1 回の「すすむ・もどる」で動かす時間 */
+  const stepMs = () => (timeline ? timeline.length / 20 : STEP_MS[span]);
+
+  function setTimeline(t: Timeline | null): void {
+    timeline = t;
+    const calendar = !t;
+    spans.hidden = !calendar;
+    jumps.hidden = !calendar;
+    now.hidden = !calendar;
+    drawSpeeds();
+    drawTicks();
+    render();
+  }
+
   function setSpan(s: Span, user = false): void {
     span = s;
     win = spanWindow(clock.ms, span, opts.tz());
@@ -103,7 +127,8 @@ export function timebar(opts: TimebarOptions): Timebar {
 
   function drawTicks(): void {
     const labels: string[] = [];
-    if (span === 'day') for (let i = 0; i <= 24; i += 6) labels.push(`${i}時`);
+    if (timeline) for (let i = 0; i <= 4; i++) labels.push(elapsedTick((timeline.length * i) / 4, timeline.length));
+    else if (span === 'day') for (let i = 0; i <= 24; i += 6) labels.push(`${i}時`);
     else if (span === 'month') {
       const days = Math.round(win.length / DAY_MS);
       for (const d of [1, 8, 15, 22, days]) labels.push(`${d}日`);
@@ -114,15 +139,16 @@ export function timebar(opts: TimebarOptions): Timebar {
   let lastDate = '';
   let lastTime = '';
   function render(): void {
+    if (timeline) win = { start: 0, length: timeline.length };
     // 再生していて範囲の外に出たら、次の範囲に進める
-    if (clock.ms < win.start || clock.ms >= win.start + win.length) {
+    else if (clock.ms < win.start || clock.ms >= win.start + win.length) {
       win = spanWindow(clock.ms, span, opts.tz());
       drawTicks();
     }
-    const label = dateTimeLabel(clock.ms, opts.tz());
+    const label = timeline ? { date: 'はじまりから', time: elapsedLabel(clock.ms, timeline.length) } : dateTimeLabel(clock.ms, opts.tz());
     if (label.date !== lastDate) date.textContent = lastDate = label.date;
     if (label.time !== lastTime) time.textContent = lastTime = label.time;
-    slider.value = String(Math.round(((clock.ms - win.start) / win.length) * STEPS));
+    slider.value = String(Math.round(Math.min(1, (clock.ms - win.start) / win.length) * STEPS));
     play.textContent = clock.playing ? '❚❚' : '▶';
     play.setAttribute('aria-label', clock.playing ? '一時停止' : '再生');
     play.setAttribute('aria-pressed', String(clock.playing));
@@ -130,12 +156,14 @@ export function timebar(opts: TimebarOptions): Timebar {
   }
 
   slider.addEventListener('input', () => {
+    // 先に読んでおく (再生を止めると、スライダーがいまの時刻の位置にかき直される)
+    const ms = win.start + (Number(slider.value) / STEPS) * win.length;
     clock.setPlaying(false);
-    clock.set(win.start + (Number(slider.value) / STEPS) * win.length);
+    clock.set(ms);
   });
   play.addEventListener('click', () => clock.setPlaying(!clock.playing));
-  back.addEventListener('click', () => clock.set(clock.ms - STEP_MS[span]));
-  fwd.addEventListener('click', () => clock.set(clock.ms + STEP_MS[span]));
+  back.addEventListener('click', () => clock.set(clock.ms - stepMs()));
+  fwd.addEventListener('click', () => clock.set(clock.ms + stepMs()));
   now.addEventListener('click', () => jump(Date.now()));
   speed.addEventListener('change', () => clock.setSpeed(speedByKey(speed.value)));
 
@@ -155,8 +183,9 @@ export function timebar(opts: TimebarOptions): Timebar {
   return {
     el,
     setSpan: (s) => setSpan(s),
+    setTimeline,
     refresh: () => {
-      win = spanWindow(clock.ms, span, opts.tz());
+      if (!timeline) win = spanWindow(clock.ms, span, opts.tz());
       drawTicks();
       render();
     },

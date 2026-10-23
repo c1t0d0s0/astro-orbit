@@ -7,7 +7,8 @@ import { cos, sin } from '../astro/math';
 import { bodiesAt } from '../astro/state';
 import { CONSTELLATIONS, STARS, starByName } from '../data/sky';
 import { COLORS, circle, polyline } from '../three/bodies';
-import { skyMatrix } from '../three/frames';
+import { auroraElevation, auroraSky, geomagLat, GEOMAG_POLE, ovalGap } from '../earth/aurora';
+import { horizonToScene, skyMatrix } from '../three/frames';
 import type { Stage } from '../three/stage';
 import { moonMaterial } from '../three/moonShader';
 import { glowTexture } from '../three/textures';
@@ -35,6 +36,7 @@ const TOGGLES: Toggle[] = [
   { key: 'lines', label: '星座(せいざ)の線(せん)' },
   { key: 'trails', label: '星(ほし)の動(うご)いたあと' },
   { key: 'pole', label: '天(てん)の北極(ほっきょく)・南極(なんきょく)' },
+  { key: 'aurora', label: 'オーロラ' },
 ];
 
 const CAMERAS: CameraPreset[] = [
@@ -47,6 +49,9 @@ const CAMERAS: CameraPreset[] = [
   { key: 'sunTrack', label: '太陽(たいよう)を追(お)う (ズーム)' },
   { key: 'moonTrack', label: '月(つき)を追(お)う (ズーム)' },
 ];
+
+/** オーロラのカーテンの、横の分け方 */
+const AURORA_SEG = 80;
 
 /** 追いかけるときの視野 (°)。この視野では、太陽と月を本当の大きさでかく */
 const TRACK_FOV = 2.6;
@@ -112,6 +117,7 @@ export class GroundView implements View {
     lines: true,
     trails: false,
     pole: false,
+    aurora: false,
   };
 
   /** 天球 (星・星座の線・天の極)。赤道座標で作り、時刻と場所に合わせて回す */
@@ -129,6 +135,8 @@ export class GroundView implements View {
   private readonly moonPath = new THREE.Group();
   private readonly trails = new THREE.Group();
   private readonly ground: THREE.Mesh<THREE.CircleGeometry, THREE.MeshLambertMaterial>;
+  /** オーロラのカーテン (下が緑、上が赤) */
+  private readonly aurora: THREE.Mesh;
   private readonly dome: THREE.Mesh;
   private readonly person: THREE.Group;
   private readonly skyColor = new THREE.Color();
@@ -268,7 +276,57 @@ export class GroundView implements View {
     root.add(this.moon);
 
     root.add(this.paths, this.sunPath, this.moonPath, this.trails);
+
+    const ageo = new THREE.BufferGeometry();
+    ageo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((AURORA_SEG + 1) * 2 * 3), 3));
+    const acol = new Float32Array((AURORA_SEG + 1) * 2 * 3);
+    for (let i = 0; i <= AURORA_SEG; i++) {
+      const edge = Math.sin((i / AURORA_SEG) * Math.PI);
+      acol.set([0.36 * edge, 0.94 * edge, 0.54 * edge], 2 * i * 3);
+      acol.set([0.5 * edge, 0.12 * edge, 0.25 * edge], (2 * i + 1) * 3);
+    }
+    ageo.setAttribute('color', new THREE.BufferAttribute(acol, 3));
+    const aidx: number[] = [];
+    for (let i = 0; i < AURORA_SEG; i++) aidx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+    ageo.setIndex(aidx);
+    this.aurora = new THREE.Mesh(ageo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.aurora.visible = false;
+    root.add(this.aurora);
     stage.controls.minDistance = 0.01;
+  }
+
+  /** オーロラのカーテンを空にかく (見えないときは false) */
+  private drawAurora(ms: number, lat: number, lon: number, sunAlt: number): boolean {
+    const m = geomagLat(lat, lon);
+    const sky = auroraSky(m, sunAlt, false);
+    if (!sky) return false;
+    // 地磁気の極の方位 (南半球では南の極)
+    const pole = m >= 0 ? GEOMAG_POLE : { lat: -GEOMAG_POLE.lat, lon: GEOMAG_POLE.lon + 180 };
+    const dl = ((pole.lon - lon) * Math.PI) / 180;
+    const p1 = (lat * Math.PI) / 180;
+    const p2 = (pole.lat * Math.PI) / 180;
+    let az = (Math.atan2(Math.sin(dl) * Math.cos(p2), Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl)) * 180) / Math.PI;
+    const gap = ovalGap(m, false);
+    // 輪より極に近い場所では、赤道のがわの空に見える
+    if (gap < 0) az += 180;
+    const low = sky === 'low';
+    const bottom = low ? Math.max(2, auroraElevation(gap, 110)) : 38;
+    const top = low ? Math.max(bottom + 6, auroraElevation(gap, 250)) : 82;
+    const pos = this.aurora.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const v = new THREE.Vector3();
+    const wave = ms / 600_000;
+    for (let i = 0; i <= AURORA_SEG; i++) {
+      const f = i / AURORA_SEG;
+      const a = az - 70 + 140 * f;
+      const sway = 4 * Math.sin(f * 11 + wave) + 2 * Math.sin(f * 23 - wave * 1.7);
+      horizonToScene(bottom + sway * 0.4, a, v).multiplyScalar(R * 0.97);
+      pos.setXYZ(2 * i, v.x, v.y, v.z);
+      horizonToScene(top + sway, a + sway * 0.5, v).multiplyScalar(R * 0.97);
+      pos.setXYZ(2 * i + 1, v.x, v.y, v.z);
+    }
+    pos.needsUpdate = true;
+    this.aurora.geometry.computeBoundingSphere();
+    return true;
   }
 
   /** 赤道座標の向きを地上の画面の向きにする行列 (時刻・場所ごと) */
@@ -339,6 +397,7 @@ export class GroundView implements View {
     const v = new THREE.Vector3();
     for (const l of this.lineLabels) l.visible = this.lines.visible && l.getWorldPosition(v).y > 0.3;
     this.pole.visible = !!o.pole;
+    this.aurora.visible = !!o.aurora && this.drawAurora(ms, lat, lon, sunAlt);
 
     // 太陽の通り道 (その日の 0 時から 24 時まで)
     this.sunPath.visible = o.sunPath !== false;
