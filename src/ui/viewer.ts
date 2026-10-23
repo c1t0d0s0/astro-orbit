@@ -288,13 +288,27 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   }
 
   // ---- 組み立て ----
+  // パネルは「説明と時間の操作」と「表示・いまのようす・場所」の 2 つに分ける。広い画面では 2 列にならべる
+  function panelColumns(main: HTMLElement[]): HTMLElement[] {
+    return [
+      h('div', { class: 'panel-col panel-main' }, ...main),
+      h(
+        'div',
+        { class: 'panel-col panel-sub' },
+        h('section', { class: 'panel-section' }, h('h2', {}, '表示'), toggleBox),
+        h('section', { class: 'panel-section' }, h('h2', {}, 'いまのようす'), infoBox),
+        placeBox,
+      ),
+    ];
+  }
+
   if (guide) {
     lead.innerHTML = rubyHtml(guide.lead);
-    panel.append(guideBox, bar.el, h('section', { class: 'panel-section' }, h('h2', {}, '表示'), toggleBox), h('section', { class: 'panel-section' }, h('h2', {}, 'いまのようす'), infoBox), placeBox);
+    panel.append(...panelColumns([guideBox, bar.el]));
     showStep(Math.min(stepIndex, guide.steps.length - 1), resume !== undefined);
     if (resume) clock.set(resume.ms);
   } else {
-    panel.append(lead, bar.el, h('section', { class: 'panel-section' }, h('h2', {}, '表示'), toggleBox), h('section', { class: 'panel-section' }, h('h2', {}, 'いまのようす'), infoBox), placeBox);
+    panel.append(...panelColumns([lead, bar.el]));
     startFree(firstView);
   }
 

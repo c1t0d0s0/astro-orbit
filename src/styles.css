@@ -635,6 +635,11 @@ rt {
   gap: 0.5rem;
 }
 
+.place-picker .select {
+  width: 100%;
+  min-width: 0;
+}
+
 .place-custom {
   display: grid;
   gap: 0.5rem;
@@ -834,6 +839,13 @@ rt {
 }
 
 .panel {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.panel-col {
   display: grid;
   align-content: start;
   gap: 1rem;
@@ -1176,4 +1188,103 @@ rt {
   fill: #3a3f4e;
   stroke: #d8d2c0;
   stroke-width: 0.8;
+}
+
+/* ---- 広い画面 (ブラウザを最大化した PC など): 縦にスクロールしなくても全体が見えるようにする ----
+   3D の画面: 3D を左いっぱいに、パネルを右に 2 列 (説明と時間の操作 / 表示・いまのようす・場所)。
+   画面の高さに合わせ、パネルの列は中身があふれたときだけ、それぞれの中でスクロールする */
+@media (min-width: 84rem) {
+  .viewer {
+    display: flex;
+    flex-direction: column;
+    max-width: none;
+    height: 100svh;
+    padding-bottom: 0.75rem;
+  }
+
+  .viewer-body {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 44rem);
+    align-items: stretch;
+  }
+
+  .stage-area {
+    position: relative;
+    top: 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  .panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    min-height: 0;
+  }
+
+  .panel-col {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* スクロールバーが中身に重ならないように */
+    padding: 1px 0.9rem 1px 1px;
+    scrollbar-width: thin;
+  }
+
+  .panel-sub > .panel-section:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  /* ホーム: 横いっぱいに広げ、解説は 4 列、3D の画面は 1 行にならべる */
+  .home {
+    max-width: 124rem;
+    grid-template-columns: minmax(0, 1fr) 19rem;
+    padding-top: 1.25rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .home-main {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 2rem;
+  }
+
+  .home-main > .cards {
+    grid-column: 1 / -1;
+  }
+
+  .hero {
+    margin-bottom: 0;
+  }
+
+  /* 列の数は、使える横幅に合わせる (1920px の画面で、解説は 4 列・3D の画面は 7 つが 1 行) */
+  .cards .card-list {
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  }
+
+  .card {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .card-lead {
+    font-size: 0.8125rem;
+  }
+
+  /* 3D の画面のカードは、絵を上にした小さなカードにする */
+  .cards .card-list.view-list {
+    grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  }
+
+  .view-list .card {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .view-list .card-lead {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }

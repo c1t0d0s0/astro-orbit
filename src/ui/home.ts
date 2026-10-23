@@ -83,7 +83,7 @@ export function renderHome(root: HTMLElement): void {
         ),
         guide('教科書(きょうかしょ)の図(ず)ではわかりにくいことも、ぐるっと回(まわ)して見(み)ればわかるよ。まずは「解説(かいせつ)」から見(み)てみよう！', { cls: 'home-guide' }),
         h('section', { class: 'cards', 'aria-labelledby': 'guides-title' }, withRuby('h2', '', '解説(かいせつ)：なぜ？を3Dで'), h('div', { class: 'card-list' }, ...GUIDES.map((g) => guideCard(g, seen[g.id] !== undefined)))),
-        h('section', { class: 'cards', 'aria-labelledby': 'views-title' }, withRuby('h2', '', '3Dで自由(じゆう)に見(み)る'), h('div', { class: 'card-list' }, ...VIEW_ORDER.map(viewCard))),
+        h('section', { class: 'cards', 'aria-labelledby': 'views-title' }, withRuby('h2', '', '3Dで自由(じゆう)に見(み)る'), h('div', { class: 'card-list view-list' }, ...VIEW_ORDER.map(viewCard))),
       ),
       h(
         'div',
