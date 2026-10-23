@@ -44,3 +44,39 @@ export function seismoChart(stations: { name: string; d: number }[], t: number, 
     `</svg>`
   );
 }
+
+/**
+ * 高さと気温のグラフ。まわりの空気 (灰色) と、上がっていく空気のかたまり (赤) の気温。
+ * 雲の底 (露点) と 0 °C の高さに線を引く。z はいまの空気のかたまりの高さ (m)。なければ点をかかない
+ */
+export function airChart(t0: number, dew: number, z: number | null, env: (z: number) => number, parcel: (z: number) => number, base: number): string {
+  const W = 320;
+  const H = 190;
+  const L = 34;
+  const T = 10;
+  const PW = W - L - 12;
+  const PH = H - T - 30;
+  const ZMAX = 8000;
+  const tMin = Math.min(-30, Math.floor(parcel(ZMAX) / 10) * 10);
+  const tMax = Math.max(30, Math.ceil(t0 / 10) * 10);
+  const x = (temp: number) => L + ((temp - tMin) / (tMax - tMin)) * PW;
+  const y = (h: number) => T + PH - (h / ZMAX) * PH;
+  const line = (f: (h: number) => number) => Array.from({ length: 41 }, (_, i) => (i / 40) * ZMAX).map((h) => `${f1(x(f(h)))},${f1(y(h))}`).join(' ');
+  const grid =
+    [0, 2000, 4000, 6000, 8000].map((h) => `<line class="c-grid" x1="${L}" x2="${L + PW}" y1="${f1(y(h))}" y2="${f1(y(h))}"/><text class="c-tick" x="${L - 4}" y="${f1(y(h) + 4)}" text-anchor="end">${h / 1000}km</text>`).join('') +
+    Array.from({ length: (tMax - tMin) / 10 + 1 }, (_, i) => tMin + i * 10)
+      .map((tc) => `<line class="c-grid" x1="${f1(x(tc))}" x2="${f1(x(tc))}" y1="${T}" y2="${T + PH}"/><text class="c-tick" x="${f1(x(tc))}" y="${T + PH + 14}" text-anchor="middle">${tc}℃</text>`)
+      .join('');
+  return (
+    `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="高さと気温のグラフ">` +
+    grid +
+    `<line class="c-freeze" x1="${f1(x(0))}" x2="${f1(x(0))}" y1="${T}" y2="${T + PH}"/>` +
+    `<line class="c-base" x1="${L}" x2="${L + PW}" y1="${f1(y(base))}" y2="${f1(y(base))}"/>` +
+    `<text class="c-tick" x="${L + PW}" y="${f1(y(base) - 4)}" text-anchor="end">雲の底 ${(base / 1000).toFixed(1)}km</text>` +
+    `<polyline class="c-line c-env" points="${line(env)}"/>` +
+    `<polyline class="c-line c-parcel" points="${line(parcel)}"/>` +
+    (z !== null ? `<circle class="c-dot" cx="${f1(x(parcel(z)))}" cy="${f1(y(z))}" r="4"/>` : '') +
+    `<text class="c-tick" x="${L + 4}" y="${H - 2}">地上 ${t0}℃・露点 ${dew}℃</text>` +
+    `</svg>`
+  );
+}

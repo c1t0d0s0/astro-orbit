@@ -1,11 +1,17 @@
+import { localSiderealTime, toHorizontal } from '../astro/coords';
+import { bodiesAt } from '../astro/state';
+import { cloudBase, envFreezing, envTemp, humidity, parcelFreezing, parcelTemp, precipType } from '../earth/air';
+import { rainbowAngle, rainbowTop } from '../earth/optics';
 import { OMORI_K, VP, VS } from '../earth/quake';
 import { SOURCE_KM, depthAt, frontAt, greenHeight, kmh, travelTime, tsunamiSpeed } from '../earth/tsunami';
+import { maxWind, strengthName, typhoonAt } from '../earth/typhoon';
 import { STATIONS, eruption, stationTimes } from '../views/solid';
+import { CLOUD_T, STORM_T, airOf, cloudTop, parcelHeight, stormStage } from '../views/weather';
 import type { ViewContext, ViewId } from '../views/types';
-import { seismoChart } from './chartEarth';
+import { airChart, seismoChart } from './chartEarth';
 import { rubyHtml } from './dom';
 import { figure, note, rows, type Row } from './infoRows';
-import { VIEWS, elapsedLabel } from './text';
+import { VIEWS, direction, elapsedLabel } from './text';
 
 // 地学の画面の「いまのようす」。地学の画面でなければ null (info.ts が天体の画面の分を出す)
 
@@ -79,8 +85,120 @@ function volcanoInfo(ms: number): string {
   return rows([['はじまりから', elapsedLabel(ms, 86_400_000)], ['いま', state]]) + figure('マグマのねばりけと火山(かざん)', table);
 }
 
-export function earthInfoHtml(view: ViewId, ms: number, _ctx: ViewContext): string | null {
+const km = (m: number) => `${(m / 1000).toFixed(1)} km`;
+
+function cloudInfo(ms: number, ctx: ViewContext): string {
+  const t = ms / 1000;
+  const winter = !!ctx.options.winter;
+  const { t0, dew } = airOf(winter);
+  const base = cloudBase(t0, dew);
+  const z = parcelHeight(t, winter);
+  const rising = t < CLOUD_T.rise;
+  const state =
+    t < CLOUD_T.rise * 0.6
+      ? '空気(くうき)のかたまりが上(あ)がって冷(ひ)えている'
+      : t < CLOUD_T.rain
+        ? '雲(くも)ができて、上(うえ)へ育(そだ)っている'
+        : t < CLOUD_T.stop
+          ? precipType(t0) === 'snow'
+            ? '雪(ゆき)がふっている'
+            : '雨(あめ)がふっている'
+          : 'ふりやんだ';
+  const list: Row[] = [
+    ['はじまりから', elapsedLabel(ms, 7_200_000)],
+    ['いま', state],
+    ['地上(ちじょう)の空気(くうき)', `気温(きおん) ${t0}℃・露点(ろてん) ${dew}℃・湿度(しつど) 約(やく)${Math.round(humidity(t0, dew))}%`],
+  ];
+  if (rising) list.push(['空気(くうき)のかたまり', `高(たか)さ ${km(z)}・${Math.round(parcelTemp(z, t0, dew))}℃`]);
+  list.push(
+    ['雲(くも)ができはじめる高(たか)さ', `約(やく)${km(base)} (気温(きおん)が露点(ろてん)まで下(さ)がる高(たか)さ)`],
+    ['雲(くも)のてっぺん', t > CLOUD_T.rise * 0.6 ? `約(やく)${km(cloudTop(t, winter))}` : 'まだ雲(くも)はない'],
+    ['雲(くも)の中(なか)で氷(こおり)になる高(たか)さ', `約(やく)${km(parcelFreezing(t0, dew))}より上(うえ)`],
+    ['まわりの空気(くうき)が0℃(ど)の高(たか)さ', envFreezing(t0) > 50 ? `約(やく)${km(envFreezing(t0))}` : '地上(ちじょう)でも0℃(ど)近(ちか)く'],
+  );
+  return (
+    rows(list) +
+    figure(
+      '高(たか)さと気温(きおん)',
+      airChart(t0, dew, rising ? z : null, (h) => envTemp(h, t0), (h) => parcelTemp(h, t0, dew), base),
+      '赤(あか)い線(せん)が上(あ)がる空気(くうき)のかたまり、灰色(はいいろ)の線(せん)がまわりの空気(くうき)。雲(くも)ができるまでは100mで約(やく)1℃(ど)、雲(くも)の中(なか)では約(やく)0.5℃(ど)下(さ)がります。かたまりのほうが暖(あたた)かいあいだは、軽(かる)いので上(あ)がり続(つづ)けます。',
+    )
+  );
+}
+
+function stormInfo(ms: number): string {
+  const t = ms / 1000;
+  const stage = stormStage(t);
+  const list: Row[] = [
+    ['はじまりから', elapsedLabel(ms, 3_600_000)],
+    ['積乱雲(せきらんうん)', stage === 'growing' ? '発達(はったつ)中(ちゅう) (強(つよ)い上昇気流(じょうしょうきりゅう))' : stage === 'mature' ? 'いちばん強(つよ)い (大雨(おおあめ)・雷(かみなり))' : 'おとろえている (下降気流(かこうきりゅう)が強(つよ)い)'],
+    ['雷(かみなり)', t >= STORM_T.bolt[0] && t < STORM_T.bolt[1] ? '光(ひか)っている' : 'なし'],
+    ['竜巻(たつまき)', t >= STORM_T.tornado[0] && t < STORM_T.tornado[1] ? '発生(はっせい)している' : 'なし'],
+  ];
+  return (
+    rows(list) +
+    note(
+      '雷(かみなり)が光(ひか)ってから音(おと)が聞(き)こえるまでの秒数(びょうすう) × 340 m が、雷(かみなり)までのおよその距離(きょり)です (音(おと)は1秒(びょう)に約(やく)340m進(すす)む)。ゴロゴロと聞(き)こえたら、すぐに建物(たてもの)や車(くるま)の中(なか)へ。',
+    )
+  );
+}
+
+const latLon = (lat: number, lon: number) => `${lat >= 0 ? '北緯(ほくい)' : '南緯(なんい)'}${Math.abs(lat).toFixed(0)}°・${lon >= 0 ? '東経(とうけい)' : '西経(せいけい)'}${Math.abs(lon).toFixed(0)}°`;
+
+function typhoonInfo(ms: number): string {
+  const day = ms / 86_400_000;
+  const s = typhoonAt(day);
+  const next = typhoonAt(day + 0.25);
+  // 進む向き (北から時計回りの方位)
+  const az = (Math.atan2((next.lon - s.lon) * Math.cos((s.lat * Math.PI) / 180), next.lat - s.lat) * 180) / Math.PI;
+  const wind = maxWind(s.pressure);
+  const state = !s.alive ? (day < 1 ? '熱帯低気圧(ねったいていきあつ) (まだ台風(たいふう)ではない)' : '温帯低気圧(おんたいていきあつ)に変(か)わった') : `${strengthName(wind)}台風(たいふう)`;
+  return (
+    rows([
+      ['はじまりから', elapsedLabel(ms, 10 * 86_400_000)],
+      ['いま', state],
+      ['中心(ちゅうしん)の位置(いち)', latLon(s.lat, s.lon)],
+      ['中心気圧(ちゅうしんきあつ)', `${Math.round(s.pressure)} hPa`],
+      ['最大風速(さいだいふうそく) (目安(めやす))', `秒速(びょうそく)約(やく)${wind} m`],
+      ['進(すす)む向(む)き', `${direction(((az % 360) + 360) % 360)}へ`],
+    ]) +
+    note(
+      '中心付近(ちゅうしんふきん)の最大風速(さいだいふうそく)が秒速(びょうそく)17.2m以上(いじょう)になった熱帯低気圧(ねったいていきあつ)を台風(たいふう)といいます。暖(あたた)かい海(うみ)からの水蒸気(すいじょうき)がエネルギーのもとなので、日本(にほん)の近(ちか)くの冷(つめ)たい海(うみ)や陸(りく)に来(く)ると弱(よわ)まります。',
+    )
+  );
+}
+
+function rainbowInfo(ms: number, ctx: ViewContext): string {
+  const b = bodiesAt(ms);
+  const sun = toHorizontal(b.sun, ctx.place.lat, localSiderealTime(b.gmst, ctx.place.lon));
+  const top = rainbowTop(sun.alt);
+  const anti = (sun.az + 180) % 360;
+  const see =
+    sun.alt < -1
+      ? '見(み)えない (太陽(たいよう)が地平線(ちへいせん)の下(した))'
+      : top <= 0
+        ? `見(み)えない (太陽(たいよう)が${Math.round(rainbowAngle(1.333))}°より高(たか)いので、虹(にじ)は地平線(ちへいせん)の下(した))`
+        : `${direction(anti)}の空(そら)に見(み)える (てっぺんの高(たか)さ 約(やく)${Math.round(top)}°)`;
+  return (
+    rows([
+      ['観察(かんさつ)地点(ちてん)', ctx.place.name],
+      ['太陽(たいよう)', sun.alt > -1 ? `${direction(sun.az)}の空(そら)、高(たか)さ ${Math.round(sun.alt)}°` : '地平線(ちへいせん)の下(した)'],
+      ['虹(にじ)', see],
+    ]) +
+    note('虹(にじ)は、太陽(たいよう)と反対(はんたい)の点(てん) (対日点(たいじつてん)) を中心(ちゅうしん)にした半径(はんけい)約(やく)42°の円(えん)の上(うえ)に見(み)えます。太陽(たいよう)が低(ひく)い朝(あさ)や夕方(ゆうがた)ほど、虹(にじ)は高(たか)く大(おお)きく見(み)えます。')
+  );
+}
+
+export function earthInfoHtml(view: ViewId, ms: number, ctx: ViewContext): string | null {
   switch (view) {
+    case 'cloud':
+      return cloudInfo(ms, ctx);
+    case 'storm':
+      return stormInfo(ms);
+    case 'typhoon':
+      return typhoonInfo(ms);
+    case 'rainbow':
+      return rainbowInfo(ms, ctx);
     case 'quake':
       return quakeInfo(ms);
     case 'tsunami':

@@ -1194,6 +1194,25 @@ rt {
   fill: rgba(224, 180, 0, 0.16);
 }
 
+/* 高さと気温: まわりの空気 (灰)・空気のかたまり (赤)・0 °C・雲の底 */
+.c-env {
+  stroke: var(--muted);
+  stroke-width: 1.6;
+}
+.c-parcel {
+  stroke: #ff5a4e;
+  stroke-width: 2;
+}
+.c-freeze {
+  stroke: #4aa3ff;
+  stroke-width: 1.2;
+}
+.c-base {
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
 /* ---- 解説 ---- */
 .guide-box {
   display: grid;

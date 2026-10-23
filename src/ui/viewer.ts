@@ -6,9 +6,11 @@ import { Stage } from '../three/stage';
 import { EclipseView } from '../views/eclipse';
 import { GroundView } from '../views/ground';
 import { MoonView } from '../views/moon';
+import { RainbowView } from '../views/rainbow';
 import { QuakeView, TsunamiView, VolcanoView } from '../views/solid';
 import { SpaceView } from '../views/space';
 import { TideView } from '../views/tide';
+import { CloudView, StormView, TyphoonView } from '../views/weather';
 import type { View, ViewContext, ViewId } from '../views/types';
 import { h, homeButton, plain, rubyHtml, setRuby } from './dom';
 import { infoHtml } from './info';
@@ -49,6 +51,14 @@ function makeView(stage: Stage, id: ViewId): View {
       return new TideView(stage);
     case 'eclipse':
       return new EclipseView(stage);
+    case 'cloud':
+      return new CloudView(stage);
+    case 'storm':
+      return new StormView(stage);
+    case 'typhoon':
+      return new TyphoonView(stage);
+    case 'rainbow':
+      return new RainbowView(stage);
     case 'quake':
       return new QuakeView(stage);
     case 'tsunami':
@@ -188,8 +198,8 @@ export function renderViewer(root: HTMLElement, target: Target, resume?: Resume)
   }
   let legendHtml = '';
   function drawLegend(): void {
-    // 地上の画面には赤い点がない。表示を切りかえて点を消したときも出さない
-    const show = viewId !== 'ground' && !VIEWS[viewId].timeline && ctx.options.place !== false;
+    // 地上・虹の画面と、現象の時間の画面には赤い点がない。表示を切りかえて点を消したときも出さない
+    const show = viewId !== 'ground' && viewId !== 'rainbow' && !VIEWS[viewId].timeline && ctx.options.place !== false;
     const html = show ? `<span class="legend-dot" aria-hidden="true"></span>${rubyHtml(`赤(あか)い点(てん)：${ctx.place.name}`)}` : '';
     if (html !== legendHtml) {
       legendHtml = html;

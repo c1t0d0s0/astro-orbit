@@ -100,6 +100,45 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
     speed: 'hour',
     camera: 'top',
   },
+  cloud: {
+    group: 'weather',
+    title: '雲(くも)のでき方(かた)と雨(あめ)・雪(ゆき)',
+    lead: 'あたためられた空気(くうき)が上(あ)がると、ふくらんで冷(ひ)え、水蒸気(すいじょうき)が水(みず)や氷(こおり)のつぶになって雲(くも)ができます。',
+    span: 'day',
+    speed: 'min1',
+    camera: 'side',
+    timeline: { length: 7_200_000, speeds: ['min1', 'min'] },
+    note: '1目盛(めも)りは高(たか)さ1km。雲(くも)つぶや雨(あめ)つぶは、見(み)えるように大(おお)きくかいています',
+  },
+  storm: {
+    group: 'weather',
+    title: '積乱雲(せきらんうん)と雷(かみなり)・竜巻(たつまき)',
+    lead: '強(つよ)い上昇気流(じょうしょうきりゅう)で、雲(くも)が高(たか)さ10km以上(いじょう)にまでのびた積乱雲(せきらんうん)。大雨(おおあめ)・雷(かみなり)・竜巻(たつまき)を起(お)こします。',
+    span: 'day',
+    speed: 'min1',
+    camera: 'side',
+    timeline: { length: 3_600_000, speeds: ['sec10', 'min1', 'min'] },
+    note: '1目盛(めも)りは約(やく)1km。竜巻(たつまき)は大(おお)きくかいています。雷(かみなり)は止(と)めていても光(ひか)ります',
+  },
+  typhoon: {
+    group: 'weather',
+    title: '台風(たいふう)の一生(いっしょう)',
+    lead: '暖(あたた)かい海(うみ)で生(う)まれた台風(たいふう)が、うずをまきながら進(すす)み、向(む)きを変(か)えていくようすを見(み)ます。',
+    span: 'day',
+    speed: 'qday',
+    camera: 'space',
+    timeline: { length: 10 * 86_400_000, speeds: ['hour', 'qday', 'day'] },
+    note: 'よくある進(すす)み方(かた)をもとにした例(れい)です。台風(たいふう)の雲(くも)は少(すこ)し大(おお)きくかいています',
+  },
+  rainbow: {
+    group: 'weather',
+    title: '虹(にじ)の見(み)える場所(ばしょ)',
+    lead: '虹(にじ)は、太陽(たいよう)を背(せ)にして、雨(あめ)がふっている方向(ほうこう)に見(み)えます。本当(ほんとう)の日時(にちじ)の太陽(たいよう)の位置(いち)で、虹(にじ)の高(たか)さをたしかめます。',
+    span: 'day',
+    speed: 'min',
+    camera: 'behind',
+    note: '雨(あめ)はいつもふっていることにしています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
+  },
   quake: {
     group: 'solid',
     title: '地震(じしん)のゆれの伝(つた)わり方(かた)',
@@ -132,7 +171,7 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
   },
 };
 
-export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide', 'quake', 'tsunami', 'volcano'];
+export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide', 'cloud', 'storm', 'typhoon', 'rainbow', 'quake', 'tsunami', 'volcano'];
 
 export const SPAN_LABEL: Record<Span, string> = { day: '1日(にち)', month: '1か月(げつ)', year: '1年(ねん)' };
 
@@ -201,7 +240,7 @@ export function elapsedLabel(ms: number, length: number): string {
   const sec = Math.max(0, Math.round(ms / 1000));
   if (length <= 3_600_000) return sec < 60 ? `${sec}秒` : `${Math.floor(sec / 60)}分${String(sec % 60).padStart(2, '0')}秒`;
   const min = Math.floor(sec / 60);
-  if (length <= 3 * 86_400_000) return `${Math.floor(min / 60)}時間${String(min % 60).padStart(2, '0')}分`;
+  if (length <= 3 * 86_400_000) return min < 60 ? `${min}分` : `${Math.floor(min / 60)}時間${String(min % 60).padStart(2, '0')}分`;
   const hour = Math.floor(min / 60);
   return `${Math.floor(hour / 24)}日と${hour % 24}時間`;
 }

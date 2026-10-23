@@ -9,6 +9,10 @@ export type ViewId =
   | 'tide'
   | 'eclipse'
   // 地学 (aurora と rainbow のほかは、日時ではなく現象の時間で動く)
+  | 'cloud'
+  | 'storm'
+  | 'typhoon'
+  | 'rainbow'
   | 'quake'
   | 'tsunami'
   | 'volcano';
