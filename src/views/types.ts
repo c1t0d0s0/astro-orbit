@@ -13,6 +13,8 @@ export type ViewId =
   | 'storm'
   | 'typhoon'
   | 'rainbow'
+  | 'river'
+  | 'current'
   | 'quake'
   | 'tsunami'
   | 'volcano';

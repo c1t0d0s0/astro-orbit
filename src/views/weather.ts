@@ -567,7 +567,7 @@ function spiralTexture(): THREE.Texture {
 
 let sstTex: THREE.Texture | null = null;
 /** 海面の水温の目安 (赤道に近いほど暖かい。台風が生まれるのは約 27 °C 以上の海) */
-function sstTexture(): THREE.Texture {
+export function sstTexture(): THREE.Texture {
   if (sstTex) return sstTex;
   const W = 512;
   const H = 256;
@@ -584,7 +584,7 @@ function sstTexture(): THREE.Texture {
       const temp = 29 - 0.012 * lat * lat + west;
       const k = Math.max(0, Math.min(1, (temp - 22) / 8));
       if (k <= 0) continue;
-      g.fillStyle = `rgba(${Math.round(255)},${Math.round(140 - 90 * k)},${Math.round(60 - 40 * k)},${(0.15 + 0.4 * k).toFixed(2)})`;
+      g.fillStyle = `rgba(${Math.round(255)},${Math.round(140 - 90 * k)},${Math.round(60 - 40 * k)},${(0.06 + 0.3 * k).toFixed(2)})`;
       g.fillRect(x, y, 4, 1);
     }
   }
@@ -597,7 +597,7 @@ function sstTexture(): THREE.Texture {
 const globe = (lat: number, lon: number, r = R) => onGlobe(lat, lon).multiplyScalar(r);
 
 /** 地球の表面にそって、東 (east) と北 (north) の向き */
-function tangents(lat: number, lon: number): { east: THREE.Vector3; north: THREE.Vector3; up: THREE.Vector3 } {
+export function tangents(lat: number, lon: number): { east: THREE.Vector3; north: THREE.Vector3; up: THREE.Vector3 } {
   const up = onGlobe(lat, lon);
   const east = new THREE.Vector3(0, 1, 0).cross(up).normalize();
   if (east.lengthSq() < 1e-6) east.set(1, 0, 0);
@@ -737,7 +737,13 @@ export class TyphoonView implements View {
     this.south.visible = !!o.south;
     this.labels.show(o.labels !== false);
     if (this.follow) this.aim();
+    this.labels.occlude(this.stage.camera.position, R);
     this.stage.invalidate();
+  }
+
+  /** 地球の裏がわの名前は、カメラを回したときにもかくす */
+  frame(): void {
+    if (this.labels.occlude(this.stage.camera.position, R)) this.stage.invalidate();
   }
 
   private aim(): void {

@@ -10,6 +10,7 @@ import { RainbowView } from '../views/rainbow';
 import { QuakeView, TsunamiView, VolcanoView } from '../views/solid';
 import { SpaceView } from '../views/space';
 import { TideView } from '../views/tide';
+import { CurrentView, RiverView } from '../views/water';
 import { CloudView, StormView, TyphoonView } from '../views/weather';
 import type { View, ViewContext, ViewId } from '../views/types';
 import { h, homeButton, plain, rubyHtml, setRuby } from './dom';
@@ -59,6 +60,10 @@ function makeView(stage: Stage, id: ViewId): View {
       return new TyphoonView(stage);
     case 'rainbow':
       return new RainbowView(stage);
+    case 'river':
+      return new RiverView(stage);
+    case 'current':
+      return new CurrentView(stage);
     case 'quake':
       return new QuakeView(stage);
     case 'tsunami':

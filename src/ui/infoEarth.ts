@@ -6,6 +6,7 @@ import { OMORI_K, VP, VS } from '../earth/quake';
 import { SOURCE_KM, depthAt, frontAt, greenHeight, kmh, travelTime, tsunamiSpeed } from '../earth/tsunami';
 import { maxWind, strengthName, typhoonAt } from '../earth/typhoon';
 import { STATIONS, eruption, stationTimes } from '../views/solid';
+import { RAIN, flood } from '../views/water';
 import { CLOUD_T, STORM_T, airOf, cloudTop, parcelHeight, stormStage } from '../views/weather';
 import type { ViewContext, ViewId } from '../views/types';
 import { airChart, seismoChart } from './chartEarth';
@@ -189,8 +190,51 @@ function rainbowInfo(ms: number, ctx: ViewContext): string {
   );
 }
 
+const REACH_ROWS: [string, string, string, string][] = [
+  ['上流(じょうりゅう)', '速(はや)い。川(かわ)はばはせまい', '大(おお)きく角(かど)ばった石(いし)', 'けずるはたらき (しん食(しょく)) が大(おお)きい。V字谷(じこく)'],
+  ['中流(ちゅうりゅう)', 'ややゆるやか', '丸(まる)みのある石(いし)・砂利(じゃり)', '運(はこ)ぶはたらき (運搬(うんぱん))。扇状地(せんじょうち)・川原(かわら)'],
+  ['下流(かりゅう)', 'ゆるやか。川(かわ)はばは広(ひろ)い', '小(ちい)さく丸(まる)い石(いし)・砂(すな)・どろ', '積(つ)もらせるはたらき (たい積(せき)) が大(おお)きい。三角州(さんかくす)'],
+];
+
+function riverInfo(ms: number): string {
+  const t = ms / 1000;
+  const f = flood(t);
+  const weather = t >= RAIN[0] && t < RAIN[1] ? '山(やま)で大雨(おおあめ)がふっている' : t < RAIN[0] ? '晴(は)れ' : '雨(あめ)はやんだ';
+  const r = rubyHtml;
+  const table = `<table class="info-table"><thead><tr><th></th><th>${r('流(なが)れ')}</th><th>${r('石(いし)')}</th><th>${r('おもなはたらき')}</th></tr></thead><tbody>${REACH_ROWS.map(
+    ([n, flow, stone, work]) => `<tr><th>${r(n)}</th><td>${r(flow)}</td><td>${r(stone)}</td><td>${r(work)}</td></tr>`,
+  ).join('')}</tbody></table>`;
+  return (
+    rows([
+      ['はじまりから', elapsedLabel(ms, 2 * 86_400_000)],
+      ['天気(てんき)', weather],
+      ['川(かわ)の水(みず)の量(りょう)', f > 0.05 ? `ふだんの約(やく)${(1 + 5 * f).toFixed(0)}倍(ばい) (増水(ぞうすい)している)` : 'ふだんどおり'],
+      ['流(なが)れる速(はや)さ', f > 0.05 ? 'ふだんより速(はや)い。大(おお)きな石(いし)も転(ころ)がって運(はこ)ばれる' : 'ふだんどおり'],
+    ]) +
+    figure('上流(じょうりゅう)・中流(ちゅうりゅう)・下流(かりゅう)のちがい', table) +
+    note('川(かわ)が曲(ま)がっているところでは、外(そと)がわは流(なが)れが速(はや)くて深(ふか)くけずられ (がけになる)、内(うち)がわは流(なが)れがおそくて石(いし)や砂(すな)が積(つ)もります (川原(かわら)になる)。')
+  );
+}
+
+function currentInfo(ms: number): string {
+  return (
+    rows([
+      ['はじまりから', elapsedLabel(ms, 365 * 86_400_000)],
+      ['暖流(だんりゅう) (赤(あか))', '赤道(せきどう)に近(ちか)い暖(あたた)かい海(うみ)から流(なが)れてくる海流(かいりゅう)'],
+      ['寒流(かんりゅう) (青(あお))', '北極(ほっきょく)や南極(なんきょく)に近(ちか)い冷(つめ)たい海(うみ)から流(なが)れてくる海流(かいりゅう)'],
+      ['黒潮(くろしお)', '日本(にほん)の南(みなみ)を北東(ほくとう)へ流(なが)れる暖流(だんりゅう)。はば約(やく)100km、速(はや)いところで秒速(びょうそく)約(やく)2m'],
+      ['親潮(おやしお)', '千島列島(ちしまれっとう)から南(みなみ)へ流(なが)れる寒流(かんりゅう)。栄養分(えいようぶん)が多(おお)く、プランクトンや魚(さかな)が多(おお)い'],
+    ]) +
+    note('黒潮(くろしお)と親潮(おやしお)がぶつかる三陸沖(さんりくおき)の「潮目(しおめ)」は、世界(せかい)有数(ゆうすう)の漁場(ぎょじょう)です。暖流(だんりゅう)が流(なが)れる近(ちか)くの陸地(りくち)は、冬(ふゆ)でも比較的(ひかくてき)暖(あたた)かくなります。')
+  );
+}
+
 export function earthInfoHtml(view: ViewId, ms: number, ctx: ViewContext): string | null {
   switch (view) {
+    case 'river':
+      return riverInfo(ms);
+    case 'current':
+      return currentInfo(ms);
     case 'cloud':
       return cloudInfo(ms, ctx);
     case 'storm':

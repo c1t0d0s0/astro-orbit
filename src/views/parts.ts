@@ -34,8 +34,35 @@ export class Labels {
     return l;
   }
 
+  /** 表示の切りかえで決まる、見せるかどうか (地球の裏がわにかくすのは別) */
+  private readonly base = new Map<CSS2DObject, boolean>();
+
   show(on: boolean): void {
-    for (const l of this.list) l.visible = on && l.parent!.visible;
+    for (const l of this.list) {
+      const v = on && l.parent!.visible;
+      this.base.set(l, v);
+      l.visible = v;
+    }
+  }
+
+  /**
+   * 原点にある半径 r の球 (地球) の裏がわにあるラベルをかくす。カメラが動くたびによぶ。
+   * 見え方が変わったら true
+   */
+  occlude(camera: THREE.Vector3, r: number): boolean {
+    let changed = false;
+    const p = new THREE.Vector3();
+    for (const l of this.list) {
+      l.getWorldPosition(p);
+      // 球の表面の点 p がカメラから見えるのは、p とカメラの向きの内積が r² より大きいとき (球より外のラベルは少しゆるめる)
+      const front = p.dot(camera) > r * r * 0.98;
+      const v = (this.base.get(l) ?? l.visible) && front;
+      if (v !== l.visible) {
+        l.visible = v;
+        changed = true;
+      }
+    }
+    return changed;
   }
 }
 

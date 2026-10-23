@@ -13,11 +13,12 @@ import { tide } from './tide';
 import { tropics } from './tropics';
 import { typhoon } from './typhoon';
 import { volcano } from './volcano';
+import { water } from './water';
 import type { Guide, When } from './types';
 
 export type { Guide, Step, When } from './types';
 
-export const GUIDES: readonly Guide[] = [seasons, sunpath, tropics, polar, moon, eclipse, stars, tide, clouds, storm, typhoon, rainbow, quake, volcano];
+export const GUIDES: readonly Guide[] = [seasons, sunpath, tropics, polar, moon, eclipse, stars, tide, clouds, storm, typhoon, rainbow, water, quake, volcano];
 
 export const guideById = (id: string) => GUIDES.find((g) => g.id === id);
 

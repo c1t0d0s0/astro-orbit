@@ -139,6 +139,26 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
     camera: 'behind',
     note: '雨(あめ)はいつもふっていることにしています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
   },
+  river: {
+    group: 'water',
+    title: '流(なが)れる水(みず)のはたらき',
+    lead: '川(かわ)の水(みず)は、土地(とち)をけずり、石(いし)や砂(すな)を運(はこ)び、積(つ)もらせます。山(やま)から海(うみ)まで、川(かわ)と土地(とち)のようすを見(み)ます。',
+    span: 'day',
+    speed: 'hour',
+    camera: 'whole',
+    timeline: { length: 2 * 86_400_000, speeds: ['min', 'hour', 'qday'] },
+    note: '横(よこ)の1目盛(めも)りは約(やく)1km。高(たか)さや川(かわ)はばは強調(きょうちょう)しています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
+  },
+  current: {
+    group: 'water',
+    title: '海流(かいりゅう)',
+    lead: '海(うみ)の水(みず)は、決(き)まった向(む)きに大(おお)きく流(なが)れています。暖(あたた)かい暖流(だんりゅう)と冷(つめ)たい寒流(かんりゅう)が、日本(にほん)のまわりにも流(なが)れています。',
+    span: 'day',
+    speed: 'week',
+    camera: 'japan',
+    timeline: { length: 365 * 86_400_000, speeds: ['day', 'week', 'month'] },
+    note: '流(なが)れの速(はや)さは、本当(ほんとう)よりずっと速(はや)くしています。通(とお)り道(みち)は目安(めやす)です',
+  },
   quake: {
     group: 'solid',
     title: '地震(じしん)のゆれの伝(つた)わり方(かた)',
@@ -171,7 +191,7 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
   },
 };
 
-export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide', 'cloud', 'storm', 'typhoon', 'rainbow', 'quake', 'tsunami', 'volcano'];
+export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide', 'cloud', 'storm', 'typhoon', 'rainbow', 'river', 'current', 'quake', 'tsunami', 'volcano'];
 
 export const SPAN_LABEL: Record<Span, string> = { day: '1日(にち)', month: '1か月(げつ)', year: '1年(ねん)' };
 
