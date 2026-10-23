@@ -15,10 +15,15 @@ import { sstTexture, tangents } from './weather';
 
 const HOUR = 3600;
 const X0 = -11.5;
-const X1 = 9.6;
+const X1 = 10.9;
+/** 三角州: 河口の少し手前 (DELTA) を頂点に、海へ扇形に広がる */
+const DELTA: [number, number] = [8.2, riverZ(8.2)];
+const DELTA_R = 2.6;
+const DELTA_ANGLE = 0.8;
 
-/** 川の中心の z (x の場所で) */
+/** 川の中心の z (x の場所で)。河口から先はまっすぐ海へ出る */
 export function riverZ(x: number): number {
+  x = Math.min(x, 9.1);
   if (x < -5) return 0.5 * Math.sin(x * 0.9 + 1.5);
   if (x < -2) return 0.5 * Math.sin(-5 * 0.9 + 1.5) * (1 - smooth(-5, -2, x));
   const a = 0.5 + 1.1 * smooth(-2, 4, x);
@@ -58,12 +63,25 @@ function landHeight(x: number, z: number): number {
   h -= 0.1 * Math.max(0, 1 - d / (w * 1.6));
   // 海と三角州
   if (x > 8.4) {
-    const delta = 1.9 - (x - 8.4) * 1.4;
-    const zd = Math.abs(z - riverZ(8.4));
     const sea = 0.04 - (x - 8.4) * 0.22;
-    return zd < delta ? Math.max(sea, 0.03 - (x - 8.4) * 0.01) : sea;
+    const e = deltaEdge(x, z);
+    return e > 0 ? Math.max(sea, 0.015 + 0.035 * Math.min(1, e * 5)) : sea;
   }
   return h;
+}
+
+/** 三角州のふち (外の境目まで) の距離 (0〜1)。外がわは 0 以下 */
+function deltaEdge(x: number, z: number): number {
+  const dx = x - DELTA[0];
+  const dz = z - DELTA[1];
+  const ang = Math.atan2(dz, dx);
+  const r = Math.hypot(dx, dz) / deltaFront(ang);
+  return Math.min(1 - r, (DELTA_ANGLE - Math.abs(ang)) * 1.5);
+}
+
+/** 三角州の先の、頂点からの距離 (分かれた川の先が少し張り出す) */
+function deltaFront(ang: number): number {
+  return DELTA_R * (1 + 0.07 * Math.cos(ang * 7.5));
 }
 
 function landColor(x: number, z: number, y: number, out: THREE.Color): void {
@@ -72,10 +90,32 @@ function landColor(x: number, z: number, y: number, out: THREE.Color): void {
   if (y < 0) out.setHex(0xc9b48a).lerp(new THREE.Color(0x3d6f9f), Math.min(1, -y * 3));
   else if (x < -5) out.setHex(0x4f7d43).lerp(new THREE.Color(0x8a7356), Math.min(1, near < 0.8 ? 0.7 : 0.15));
   else if (Math.hypot(x + 5, z * 1.1) < 3.6) out.setHex(0xa49a6a);
-  else if (x > 8.3) out.setHex(0xd9c79a);
+  else if (deltaEdge(x, z) > 0) out.setHex(0xc4bb7c);
+  else if (x > 8.3) out.setHex(0xe0d0a2);
   else out.setHex(0x78a65a);
   // 川原 (石や砂が積もったところ)
   if (y >= 0 && near < 0.55 && x > -5) out.lerp(new THREE.Color(0xd8cba6), 0.55);
+}
+
+/** 点の列にそった、はばが w0 から w1 へ広がる帯 (水面) */
+function ribbon(pts: THREE.Vector3[], w0: number, w1: number, color: number): THREE.Mesh {
+  const pos: number[] = [];
+  const idx: number[] = [];
+  pts.forEach((c, i) => {
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(pts.length - 1, i + 1)];
+    const w = (w0 + (w1 - w0) * (i / (pts.length - 1))) / 2;
+    const nx = -(b.z - a.z);
+    const nz = b.x - a.x;
+    const l = Math.hypot(nx, nz) || 1;
+    pos.push(c.x + (nx / l) * w, c.y, c.z + (nz / l) * w, c.x - (nx / l) * w, c.y, c.z - (nz / l) * w);
+    if (i > 0) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
 }
 
 const RIVER_TOGGLES: Toggle[] = [
@@ -122,7 +162,7 @@ export class RiverView implements View {
     light.position.set(-4, 10, 6);
     root.add(light);
 
-    root.add(terrain(26, 16, 220, 130, landHeight, landColor, [-0.5, 0]));
+    root.add(terrain(26, 16, 312, 192, landHeight, landColor, [-0.5, 0]));
     // 海
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(6, 16).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3d8ee0, transparent: true, opacity: 0.75 }));
     sea.position.set(9.8, 0.005, 0);
@@ -157,6 +197,20 @@ export class RiverView implements View {
     lake.position.set(5.2, landHeight(5.2, -2.6) + 0.02, -2.6);
     root.add(lake);
 
+    // 三角州の上で分かれた川 (まん中は本流)
+    for (const side of [-1, 1]) {
+      const pts: THREE.Vector3[] = [];
+      for (let s = 0; s <= 24; s++) {
+        const u = s / 24;
+        const ang = side * (0.12 + 0.42 * u);
+        const r = 0.3 + (deltaFront(side * 0.54) + 0.1 - 0.3) * u;
+        const x = DELTA[0] + r * Math.cos(ang);
+        const z = DELTA[1] + r * Math.sin(ang);
+        pts.push(new THREE.Vector3(x, Math.max(landHeight(x, z) + 0.03, 0.012), z));
+      }
+      root.add(ribbon(pts, 0.16, 0.28, 0x3d8ee0));
+    }
+
     this.flow = new Particles(FLOW_N, 0.16, { opacity: 0.95 });
     this.stones = new Particles(60, 0.32, { opacity: 1, color: 0x8a7a68 });
     this.sand = new Particles(200, 0.12, { opacity: 1, color: 0xc8a66a });
@@ -186,7 +240,7 @@ export class RiverView implements View {
     this.labels.add(root, 'V字谷(じこく)', [-9, 2.4, riverZ(-9)]);
     this.labels.add(root, '扇状地(せんじょうち)', [-3.6, 1.2, 1.4]);
     this.labels.add(root, '三日月湖(みかづきこ)', [5.2, 0.7, -2.6], 'is-small');
-    this.labels.add(root, '三角州(さんかくす)', [9, 0.6, riverZ(8.4) + 1.2]);
+    this.labels.add(root, '三角州(さんかくす)', [9.4, 0.25, DELTA[1] + 1.4]);
     this.labels.add(root, '海(うみ)', [11, 0.4, -4]);
     this.labels.add(root, '上流(じょうりゅう)', [-9, 4.6, -4], 'is-small');
     this.labels.add(root, '中流(ちゅうりゅう)', [-1, 1.6, -4], 'is-small');
@@ -318,7 +372,7 @@ export class RiverView implements View {
   setCamera(key: string): void {
     if (key === 'upper') placeCamera(this.stage, [-6, 4.5, 5], [-9, 1.4, 0], 1);
     else if (key === 'middle') placeCamera(this.stage, [0, 4, 6.5], [0.5, 0, 0], 1);
-    else if (key === 'lower') placeCamera(this.stage, [11, 3.5, 5], [7, 0, 0], 1);
+    else if (key === 'lower') placeCamera(this.stage, [12, 4, 5.5], [7.5, 0, 0], 1);
     else placeCamera(this.stage, [0, 13, 15], [-0.5, 0.5, 0], 1.3);
   }
 }
