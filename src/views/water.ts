@@ -56,7 +56,41 @@ function coastDist(x: number, z: number): number {
   return (x - coastX(z)) / Math.hypot(1, slope);
 }
 
-const X1 = coastX(DELTA_Z) + 0.05;
+/** 川の水が海へ出てから、海にとけこむまでの長さ */
+const OUTFLOW = 0.6;
+const X1 = coastX(DELTA_Z) + OUTFLOW;
+
+/** 三角州の上で本流から分かれる 2 本の川の中心線。ゆるく曲がって、それぞれの河口から海へ出る */
+const BRANCHES: THREE.Vector2[][] = [MOUTHS[0], MOUTHS[2]].map((zm) => {
+  const f = new THREE.Vector2(8.7, riverZ(8.7));
+  const m = new THREE.Vector2(coastX(zm) + OUTFLOW, zm);
+  const k = new THREE.Vector2(f.x + 0.5, f.y + (zm - f.y) * 0.75);
+  const pts: THREE.Vector2[] = [];
+  for (let s = 0; s <= 24; s++) {
+    const u = s / 24;
+    pts.push(new THREE.Vector2((1 - u) ** 2 * f.x + 2 * u * (1 - u) * k.x + u * u * m.x, (1 - u) ** 2 * f.y + 2 * u * (1 - u) * k.y + u * u * m.y));
+  }
+  return pts;
+});
+
+/** 分かれた川の中心線までの距離 */
+function branchDist(x: number, z: number): number {
+  let best = Infinity;
+  const p = new THREE.Vector2(x, z);
+  const q = new THREE.Vector2();
+  for (const pts of BRANCHES) {
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1];
+      const ab = q.copy(pts[i]).sub(a);
+      const t = Math.min(1, Math.max(0, p.clone().sub(a).dot(ab) / ab.lengthSq()));
+      best = Math.min(best, p.distanceTo(ab.multiplyScalar(t).add(a)));
+    }
+  }
+  return best;
+}
+
+/** 海へ出た川の水が、海にとけこんでいく (1 は川の水、0 は海) */
+const outflowAlpha = (x: number, z: number) => 1 - smooth(0, OUTFLOW, coastDist(x, z));
 
 /** 土地の高さ */
 function landHeight(x: number, z: number): number {
@@ -77,11 +111,12 @@ function landHeight(x: number, z: number): number {
   // 海岸の近くは海面より少し高い平らな土地 (三角州)
   const c = coastDist(x, z);
   if (x > 7.5) h = Math.max(h, 0.025 + 0.025 * Math.min(1, -c * 1.5));
-  // 川の流れるところは少し低い (三角州の上では浅い)
+  // 川の流れるところは少し低い。三角州の上で分かれた川も、そのまま海までつながる
   const w = 0.2 + 0.25 * smooth(-5, 6, x);
-  h -= 0.1 * (1 - 0.8 * smooth(8, 9, x)) * Math.max(0, 1 - d / (w * 1.6));
+  h -= 0.1 * Math.max(0, 1 - d / (w * 1.6));
+  if (x > 8.5) h = Math.min(h, -0.05 + 0.1 * Math.min(1, branchDist(x, z) / 0.16) + 0.1 * smooth(8.9, 8.5, x));
   // 海: 岸からゆるやかに深くなる
-  return c > 0 ? 0.025 - c * 0.2 : h;
+  return c > 0 ? Math.min(0.025 - c * 0.2, h) : h;
 }
 
 function landColor(x: number, z: number, y: number, out: THREE.Color): void {
@@ -99,9 +134,10 @@ function landColor(x: number, z: number, y: number, out: THREE.Color): void {
   if (y >= 0 && near < 0.55 && x > -5) out.lerp(new THREE.Color(0xd8cba6), 0.55);
 }
 
-/** 点の列にそった、はばが w0 から w1 へ広がる帯 (水面) */
+/** 点の列にそった、はばが w0 から w1 へ広がる帯 (水面)。海へ出たところは海にとけこむ */
 function ribbon(pts: THREE.Vector3[], w0: number, w1: number, color: number): THREE.Mesh {
   const pos: number[] = [];
+  const cols: number[] = [];
   const idx: number[] = [];
   pts.forEach((c, i) => {
     const a = pts[Math.max(0, i - 1)];
@@ -111,13 +147,23 @@ function ribbon(pts: THREE.Vector3[], w0: number, w1: number, color: number): TH
     const nz = b.x - a.x;
     const l = Math.hypot(nx, nz) || 1;
     pos.push(c.x + (nx / l) * w, c.y, c.z + (nz / l) * w, c.x - (nx / l) * w, c.y, c.z - (nz / l) * w);
+    const alpha = outflowAlpha(c.x, c.z);
+    cols.push(1, 1, 1, alpha, 1, 1, 1, alpha);
     if (i > 0) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
   });
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 4));
   geo.setIndex(idx);
   geo.computeVertexNormals();
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+  const mesh = new THREE.Mesh(geo, waterMaterial(color));
+  mesh.renderOrder = 1;
+  return mesh;
+}
+
+/** 川の水面の材質。頂点ごとの透明度で、海へ出たところをぼかす (海の面より後にかく) */
+function waterMaterial(color: number): THREE.MeshLambertMaterial {
+  return new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide, vertexColors: true, transparent: true, depthWrite: false });
 }
 
 const RIVER_TOGGLES: Toggle[] = [
@@ -188,8 +234,12 @@ export class RiverView implements View {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((SEG + 1) * 2 * 3), 3));
     const idx: number[] = [];
     for (let i = 0; i < SEG; i++) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+    const cols = new Float32Array((SEG + 1) * 2 * 4);
+    this.centers.forEach((c, i) => cols.set([1, 1, 1, outflowAlpha(c.x, c.z), 1, 1, 1, outflowAlpha(c.x, c.z)], i * 8));
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 4));
     geo.setIndex(idx);
-    this.water = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x3d8ee0, side: THREE.DoubleSide }));
+    this.water = new THREE.Mesh(geo, waterMaterial(0x3d8ee0));
+    this.water.renderOrder = 1;
     root.add(this.water);
 
     // 三日月湖 (曲がりくねった川の一部が取り残された湖)
@@ -199,18 +249,9 @@ export class RiverView implements View {
     lake.position.set(5.2, landHeight(5.2, -2.6) + 0.02, -2.6);
     root.add(lake);
 
-    // 三角州の上で分かれた川 (まん中は本流)。本流から分かれ、ゆるく曲がってそれぞれの河口へ
-    for (const zm of [MOUTHS[0], MOUTHS[2]]) {
-      const f = new THREE.Vector2(8.7, riverZ(8.7));
-      const m = new THREE.Vector2(coastX(zm) + 0.05, zm);
-      const k = new THREE.Vector2(f.x + 0.5, f.y + (zm - f.y) * 0.75);
-      const pts: THREE.Vector3[] = [];
-      for (let s = 0; s <= 24; s++) {
-        const u = s / 24;
-        const x = (1 - u) ** 2 * f.x + 2 * u * (1 - u) * k.x + u * u * m.x;
-        const z = (1 - u) ** 2 * f.y + 2 * u * (1 - u) * k.y + u * u * m.y;
-        pts.push(new THREE.Vector3(x, Math.max(landHeight(x, z) + 0.03, 0.012), z));
-      }
+    // 三角州の上で分かれた川 (まん中は本流)
+    for (const b of BRANCHES) {
+      const pts = b.map((q) => new THREE.Vector3(q.x, Math.max(landHeight(q.x, q.y) + 0.035, 0.012), q.y));
       root.add(ribbon(pts, 0.12, 0.2, 0x3d8ee0));
     }
 
@@ -220,6 +261,8 @@ export class RiverView implements View {
     this.rain = new Particles(300, 0.1, { opacity: 0.8, color: 0xd8e8ff });
     this.clouds = new Particles(140, 3.5, { opacity: 0.6, color: 0x9aa4b0 });
     root.add(this.flow.points, this.stones.points, this.sand.points, this.rain.points, this.clouds.points);
+    // 水のつぶや石・砂は、川の水面より後にかく
+    for (const q of [this.flow, this.stones, this.sand]) q.points.renderOrder = 2;
 
     // けずる (外がわ・赤) と積もる (内がわ・黄) の印。平地の曲がり角ごと (名前は 2 つ目の曲がり角につける)
     for (let n = 0; n < 6; n++) {
