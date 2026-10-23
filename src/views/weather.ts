@@ -55,7 +55,7 @@ function groundDisc(r: number, color: number): THREE.Mesh {
 
 const CLOUD_TOGGLES: Toggle[] = [
   { key: 'ruler', label: '高(たか)さと気温(きおん)' },
-  { key: 'freezing', label: '0℃(ど)の高(たか)さ' },
+  { key: 'freezing', label: '0℃の高(たか)さ' },
   { key: 'updraft', label: '上昇気流(じょうしょうきりゅう)' },
   { key: 'winter', label: '冬(ふゆ)の雲(くも)' },
   { key: 'labels', label: '名前(なまえ)' },
@@ -126,7 +126,7 @@ export class CloudView implements View {
     // 0 °C の高さ (まわりの空気が 0 °C になる高さ。雪はこれより下でとけて雨になる)
     this.freezing = new THREE.Mesh(new THREE.PlaneGeometry(16, 10).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
     root.add(this.freezing);
-    this.freezingLabel = stage.label('0℃(ど)の高(たか)さ', 'is-small is-cold');
+    this.freezingLabel = stage.label('0℃の高(たか)さ', 'is-small is-cold');
     this.freezingLabel.position.set(6.5, 0, 0);
     this.freezing.add(this.freezingLabel);
     // 雲の底 (雲ができはじめる高さ)
@@ -636,7 +636,7 @@ export class TyphoonView implements View {
 
     this.sst = new THREE.Mesh(new THREE.SphereGeometry(R * 1.003, 96, 48), new THREE.MeshBasicMaterial({ map: sstTexture(), transparent: true, depthWrite: false }));
     root.add(this.sst);
-    this.labels.add(this.sst, '暖(あたた)かい海(うみ) (27℃(ど)以上(いじょう))', globe(5, 160, R * 1.05), 'is-small is-warm');
+    this.labels.add(this.sst, '暖(あたた)かい海(うみ) (27℃以上(いじょう))', globe(5, 160, R * 1.05), 'is-small is-warm');
 
     // 台風の雲 (地球の表面にそって置いた円盤)
     const mat = new THREE.MeshBasicMaterial({ map: spiralTexture(), transparent: true, depthWrite: false, side: THREE.DoubleSide });

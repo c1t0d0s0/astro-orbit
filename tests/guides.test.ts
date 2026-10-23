@@ -70,6 +70,8 @@ describe('解説', () => {
         if (timeline && s.speed) expect(timeline.speeds, `${g.id}/${s.title}`).toContain(s.speed);
         // ふりがなの書き方 「漢字(かな)」 のかっこが閉じている
         for (const text of [s.title, s.easy]) expect(text.split('(').length, text).toBe(text.split(')').length);
+        // よみは漢字のすぐあとにだけ書く (「℃(ど)」のように漢字でない字につけると、かっこのまま出てしまう)
+        for (const text of [s.title, s.easy]) expect(text, text).not.toMatch(/[^一-龠々ヶ\s（(]\([ぁ-ん]+\)/);
       }
     });
   }
