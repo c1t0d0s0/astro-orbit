@@ -6,22 +6,16 @@ import { tideName, tideRange } from '../astro/tide';
 import type { ViewContext, ViewId } from '../views/types';
 import { beamChart, daylightChart, tideChart } from './chart';
 import { h, rubyHtml } from './dom';
+import { earthInfoHtml } from './infoEarth';
+import { figure, rows, type Row } from './infoRows';
 import { dateTimeLabel, direction, hoursLabel, phaseName, seasonName, shortDate, timeLabel } from './text';
 
 // 画面ごとの「いまのようす」(数字とグラフ)。時刻が変わるたびに書きなおす (再生中は 1 秒に数回まで)
 
-type Row = [label: string, value: string];
 
 const TIDE_LABEL = { spring: '大潮(おおしお)', middle: '中潮(なかしお)', neap: '小潮(こしお)' };
 const PHASE_LABEL: Record<MoonPhase, string> = { new: '新月(しんげつ)', first: '上弦(じょうげん)', full: '満月(まんげつ)', last: '下弦(かげん)' };
 
-function rows(list: Row[]): string {
-  return `<dl class="info-rows">${list.map(([k, v]) => `<div><dt>${rubyHtml(k)}</dt><dd>${rubyHtml(v)}</dd></div>`).join('')}</dl>`;
-}
-
-function figure(title: string, svg: string, note = ''): string {
-  return `<figure class="info-fig"><figcaption>${rubyHtml(title)}</figcaption>${svg}${note ? `<p class="info-note">${rubyHtml(note)}</p>` : ''}</figure>`;
-}
 
 /** 春分・夏至・冬至の通り道の色 (views/ground.ts の COLORS と同じ) */
 const LEGEND =
@@ -126,6 +120,8 @@ function nextPhases(ms: number, tz: number): Row {
 }
 
 export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
+  const earth = earthInfoHtml(view, ms, ctx);
+  if (earth !== null) return earth;
   const { place } = ctx;
   const { b, sun, moon, lst } = skyNow(ms, ctx);
   const south = place.lat < 0;
@@ -195,6 +191,8 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
         )
       );
     }
+     default:
+      return '';
   }
 }
 

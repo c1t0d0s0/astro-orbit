@@ -6,6 +6,7 @@ import land from '../data/land.json';
 let earth: THREE.Texture | null = null;
 let moon: THREE.Texture | null = null;
 let glow: THREE.Texture | null = null;
+let soft: THREE.Texture | null = null;
 
 function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement('canvas');
@@ -123,4 +124,19 @@ export function glowTexture(): THREE.Texture {
   glow = new THREE.CanvasTexture(c);
   glow.colorSpace = THREE.SRGBColorSpace;
   return glow;
+}
+
+/** 雲・火山灰などの、ふちのぼやけた白い丸 (色は材質や頂点の色でつける) */
+export function softTexture(): THREE.Texture {
+  if (soft) return soft;
+  const [c, g] = canvas(64, 64);
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, 'rgba(255,255,255,1)');
+  r.addColorStop(0.45, 'rgba(255,255,255,0.75)');
+  r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r;
+  g.fillRect(0, 0, 64, 64);
+  soft = new THREE.CanvasTexture(c);
+  soft.colorSpace = THREE.SRGBColorSpace;
+  return soft;
 }

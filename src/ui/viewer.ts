@@ -6,6 +6,7 @@ import { Stage } from '../three/stage';
 import { EclipseView } from '../views/eclipse';
 import { GroundView } from '../views/ground';
 import { MoonView } from '../views/moon';
+import { QuakeView, TsunamiView, VolcanoView } from '../views/solid';
 import { SpaceView } from '../views/space';
 import { TideView } from '../views/tide';
 import type { View, ViewContext, ViewId } from '../views/types';
@@ -48,6 +49,12 @@ function makeView(stage: Stage, id: ViewId): View {
       return new TideView(stage);
     case 'eclipse':
       return new EclipseView(stage);
+    case 'quake':
+      return new QuakeView(stage);
+    case 'tsunami':
+      return new TsunamiView(stage);
+    case 'volcano':
+      return new VolcanoView(stage);
     default:
       return new SpaceView(stage, id);
   }

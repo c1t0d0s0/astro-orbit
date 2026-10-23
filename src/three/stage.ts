@@ -45,6 +45,8 @@ export class Stage {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(width, height);
     this.renderer.autoClear = false;
+    // 地学の画面で、地面の中の波などを箱の中だけにかくのに使う
+    this.renderer.localClippingEnabled = true;
     this.renderer.domElement.classList.add('stage-canvas');
     this.labels.setSize(width, height);
     this.labels.domElement.classList.add('stage-labels');

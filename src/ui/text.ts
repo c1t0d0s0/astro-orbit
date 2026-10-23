@@ -100,9 +100,39 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
     speed: 'hour',
     camera: 'top',
   },
+  quake: {
+    group: 'solid',
+    title: '地震(じしん)のゆれの伝(つた)わり方(かた)',
+    lead: '地下(ちか)で岩盤(がんばん)がずれると、P波(は)とS波(は)の2つの波(なみ)がまわりに広(ひろ)がります。速(はや)いP波(は)が先(さき)に着(つ)きます。',
+    span: 'day',
+    speed: 'real',
+    camera: 'tilt',
+    timeline: { length: 120_000, speeds: ['real', 'sec10'] },
+    note: '1目盛(めも)りは実際(じっさい)の約(やく)20km。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
+  },
+  tsunami: {
+    group: 'solid',
+    title: '津波(つなみ)の伝(つた)わり方(かた)',
+    lead: '海(うみ)の底(そこ)が持(も)ち上(あ)がると、海(うみ)の水(みず)全体(ぜんたい)が動(うご)いて津波(つなみ)になります。深(ふか)い海(うみ)ほど速(はや)く進(すす)みます。',
+    span: 'day',
+    speed: 'min1',
+    camera: 'tilt',
+    timeline: { length: 3_600_000, speeds: ['sec10', 'min1', 'min'] },
+    note: '海(うみ)の深(ふか)さは約(やく)10倍(ばい)、津波(つなみ)の高(たか)さはもっと大(おお)きく強調(きょうちょう)しています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
+  },
+  volcano: {
+    group: 'solid',
+    title: '火山(かざん)とマグマのねばりけ',
+    lead: 'マグマのねばりけによって、火山(かざん)の形(かたち)や噴火(ふんか)のしかた、溶岩(ようがん)の色(いろ)がちがいます。',
+    span: 'day',
+    speed: 'hour',
+    camera: 'all',
+    timeline: { length: 86_400_000, speeds: ['min', 'hour'] },
+    note: '形(かたち)のちがいがわかるように、大(おお)きさをそろえてならべています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
+  },
 };
 
-export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide'];
+export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide', 'quake', 'tsunami', 'volcano'];
 
 export const SPAN_LABEL: Record<Span, string> = { day: '1日(にち)', month: '1か月(げつ)', year: '1年(ねん)' };
 

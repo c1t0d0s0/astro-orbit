@@ -156,8 +156,10 @@ export function timebar(opts: TimebarOptions): Timebar {
   }
 
   slider.addEventListener('input', () => {
+    // 先に読んでおく (再生を止めると、スライダーがいまの時刻の位置にかき直される)
+    const ms = win.start + (Number(slider.value) / STEPS) * win.length;
     clock.setPlaying(false);
-    clock.set(win.start + (Number(slider.value) / STEPS) * win.length);
+    clock.set(ms);
   });
   play.addEventListener('click', () => clock.setPlaying(!clock.playing));
   back.addEventListener('click', () => clock.set(clock.ms - stepMs()));

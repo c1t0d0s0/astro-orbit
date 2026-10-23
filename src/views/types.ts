@@ -1,6 +1,17 @@
 import type { NamedPlace } from '../data/places';
 
-export type ViewId = 'space' | 'seasons' | 'polar' | 'ground' | 'moon' | 'tide' | 'eclipse';
+export type ViewId =
+  | 'space'
+  | 'seasons'
+  | 'polar'
+  | 'ground'
+  | 'moon'
+  | 'tide'
+  | 'eclipse'
+  // 地学 (aurora と rainbow のほかは、日時ではなく現象の時間で動く)
+  | 'quake'
+  | 'tsunami'
+  | 'volcano';
 
 /** 表示の切りかえ (ボタン 1 つ) */
 export interface Toggle {
