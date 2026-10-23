@@ -26,6 +26,7 @@ export function resolveWhen(when: When, now: number, tz: number): number {
   const year = new Date(now + tz * 3_600_000).getUTCFullYear();
   if ('season' in when) return atHour(seasonPoint(year, when.season), when.hour, tz);
   if ('now' in when) return now;
+  if ('elapsed' in when) return when.elapsed * 1000;
   if ('at' in when) return Date.parse(`${when.at}:00Z`);
   if ('phase' in when) {
     const t = nextPhase(when.after ? Date.parse(`${when.after}T00:00:00Z`) : now, when.phase);

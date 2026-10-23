@@ -15,6 +15,8 @@ export type When =
   | { at: string }
   /** いまの時刻 */
   | { now: true }
+  /** 現象の時間の画面で、はじまりから elapsed 秒 */
+  | { elapsed: number }
   /** 今年の month 月 day 日の、その場所の hour 時 */
   | { month: number; day: number; hour: number };
 

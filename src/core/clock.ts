@@ -11,6 +11,7 @@ export interface Speed {
 
 export const SPEEDS: readonly Speed[] = [
   { key: 'real', label: 'ふつう', ms: 1000 },
+  { key: 'sec10', label: '1秒(びょう)で10秒(びょう)', ms: 10_000 },
   { key: 'min1', label: '1秒(びょう)で1分(ぷん)', ms: 60_000 },
   { key: 'min', label: '1秒(びょう)で10分(ぷん)', ms: 600_000 },
   { key: 'hour', label: '1秒(びょう)で1時間(じかん)', ms: 3_600_000 },
@@ -20,7 +21,7 @@ export const SPEEDS: readonly Speed[] = [
   { key: 'month', label: '1秒(びょう)で1か月(げつ)', ms: 30 * DAY_MS },
 ];
 
-export const speedByKey = (key: string) => SPEEDS.find((s) => s.key === key) ?? SPEEDS[2];
+export const speedByKey = (key: string) => SPEEDS.find((s) => s.key === key) ?? SPEEDS[3];
 
 /** スライダーで動かせる範囲 */
 export type Span = 'day' | 'month' | 'year';
@@ -28,7 +29,9 @@ export type Span = 'day' | 'month' | 'year';
 export class Clock {
   ms: number;
   playing = false;
-  speed: Speed = SPEEDS[2];
+  speed: Speed = SPEEDS[3];
+  /** 時刻の範囲 (現象の時間の画面で、はじまりからおわりまで)。null なら日時でかぎりなし */
+  range: [number, number] | null = null;
   private readonly listeners = new Set<() => void>();
 
   constructor(ms = Date.now()) {
@@ -47,11 +50,13 @@ export class Clock {
 
   set(ms: number): void {
     if (!Number.isFinite(ms)) return;
-    this.ms = ms;
+    this.ms = this.range ? Math.min(Math.max(ms, this.range[0]), this.range[1]) : ms;
     this.emit();
   }
 
   setPlaying(playing: boolean): void {
+    // おわりまで進んでいたら、はじめから再生する
+    if (playing && this.range && this.ms >= this.range[1]) this.ms = this.range[0];
     this.playing = playing;
     this.emit();
   }
@@ -65,6 +70,11 @@ export class Clock {
   tick(dt: number): void {
     if (!this.playing) return;
     this.ms += dt * this.speed.ms;
+    // 現象の時間は、おわりで止める
+    if (this.range && this.ms >= this.range[1]) {
+      this.ms = this.range[1];
+      this.playing = false;
+    }
     this.emit();
   }
 }

@@ -413,7 +413,7 @@ rt {
 }
 
 
-/* ======== ここから天体ビューア ======== */
+/* ======== ここから地学ビューア ======== */
 
 .crest {
   grid-template-columns: repeat(2, var(--crest));
@@ -508,6 +508,22 @@ rt {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
+}
+
+/* 分野ごとのまとまり (見出しと、その分野のカード) */
+.card-group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.card-group + .card-group {
+  margin-top: 0.5rem;
+}
+
+.home .card-group-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 @media (min-width: 40rem) {
