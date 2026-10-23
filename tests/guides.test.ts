@@ -10,7 +10,7 @@ const TOGGLES: Record<string, string[]> = {
   seasons: ['ghosts', 'notilt', 'place', 'labels'],
   polar: ['circles', 'tropics', 'subsolar', 'place', 'labels'],
   eclipse: ['shadows', 'plane', 'nodes', 'labels'],
-  ground: ['sunPath', 'seasonPaths', 'moonPath', 'stars', 'daystars', 'lines', 'trails', 'pole'],
+  ground: ['sunPath', 'seasonPaths', 'moonPath', 'stars', 'daystars', 'lines', 'trails', 'pole', 'aurora'],
   moon: ['ghosts', 'inset', 'south', 'labels'],
   tide: ['moonForce', 'sunForce', 'arrows', 'place', 'labels'],
   cloud: ['ruler', 'freezing', 'updraft', 'winter', 'labels'],
@@ -22,6 +22,7 @@ const TOGGLES: Record<string, string[]> = {
   quake: ['pWave', 'sWave', 'plates', 'stations', 'labels'],
   tsunami: ['speed', 'depth', 'labels'],
   volcano: ['section', 'lava', 'ash', 'labels'],
+  aurora: ['wind', 'field', 'aurora', 'storm', 'place', 'labels'],
 };
 const CAMERAS: Record<string, string[]> = {
   space: ['whole', 'top', 'earth'],
@@ -40,6 +41,7 @@ const CAMERAS: Record<string, string[]> = {
   quake: ['tilt', 'section', 'top'],
   tsunami: ['tilt', 'section', 'shore'],
   volcano: ['all', 'shield', 'strato', 'dome'],
+  aurora: ['space', 'north', 'south', 'night'],
 };
 
 describe('解説', () => {

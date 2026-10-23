@@ -1,6 +1,7 @@
 import { localSiderealTime, toHorizontal } from '../astro/coords';
 import { bodiesAt } from '../astro/state';
 import { cloudBase, envFreezing, envTemp, humidity, parcelFreezing, parcelTemp, precipType } from '../earth/air';
+import { auroraSky, geomagLat, ovalLat } from '../earth/aurora';
 import { rainbowAngle, rainbowTop } from '../earth/optics';
 import { OMORI_K, VP, VS } from '../earth/quake';
 import { SOURCE_KM, depthAt, frontAt, greenHeight, kmh, travelTime, tsunamiSpeed } from '../earth/tsunami';
@@ -229,8 +230,31 @@ function currentInfo(ms: number): string {
   );
 }
 
+function auroraInfo(ms: number, ctx: ViewContext): string {
+  const b = bodiesAt(ms);
+  const { lat, lon, name } = ctx.place;
+  const sun = toHorizontal(b.sun, lat, localSiderealTime(b.gmst, lon));
+  const storm = !!ctx.options.storm;
+  const m = geomagLat(lat, lon);
+  const sky = auroraSky(m, sun.alt, storm);
+  const dark = sun.alt <= -10;
+  return (
+    rows([
+      ['観察(かんさつ)地点(ちてん)', name],
+      ['地磁気緯度(ちじききど)', `${m >= 0 ? '北' : '南'} ${Math.abs(m).toFixed(0)}° (オーロラの輪(わ)は約(やく)${ovalLat(storm)}°)`],
+      ['空(そら)の明(あか)るさ', dark ? '暗(くら)い夜(よる)' : sun.alt > 0 ? '昼(ひる)' : '夕方(ゆうがた)か明(あ)け方(がた) (まだ明(あか)るい)'],
+      ['オーロラ', sky === 'overhead' ? '頭(あたま)の上(うえ)に見(み)えそう' : sky === 'low' ? '低(ひく)い空(そら)に見(み)えそう' : dark ? 'この場所(ばしょ)からは見(み)えない' : '空(そら)が明(あか)るくて見(み)えない'],
+    ]) +
+    note(
+      'オーロラの色(いろ)は、光(ひか)る空気(くうき)の種類(しゅるい)と高(たか)さで決(き)まります。高(たか)さ100〜200kmの酸素(さんそ)は緑(みどり)、200km以上(いじょう)の酸素(さんそ)は赤(あか)、窒素(ちっそ)はピンクやむらさきに光(ひか)ります。オーロラの強(つよ)さは太陽(たいよう)の活動(かつどう)で変(か)わるので、この画面(がめん)の「見(み)えそう」は目安(めやす)です。',
+    )
+  );
+}
+
 export function earthInfoHtml(view: ViewId, ms: number, ctx: ViewContext): string | null {
   switch (view) {
+    case 'aurora':
+      return auroraInfo(ms, ctx);
     case 'river':
       return riverInfo(ms);
     case 'current':

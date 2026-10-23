@@ -52,10 +52,14 @@ export class Labels {
   occlude(camera: THREE.Vector3, r: number): boolean {
     let changed = false;
     const p = new THREE.Vector3();
+    const d = new THREE.Vector3();
     for (const l of this.list) {
       l.getWorldPosition(p);
-      // 球の表面の点 p がカメラから見えるのは、p とカメラの向きの内積が r² より大きいとき (球より外のラベルは少しゆるめる)
-      const front = p.dot(camera) > r * r * 0.98;
+      // カメラからラベルまでの線が、とちゅうで球を通るならかくれている (表面すれすれのラベルは少しゆるめる)
+      d.subVectors(p, camera);
+      const t = -camera.dot(d) / d.lengthSq();
+      const near = t > 0 && t < 1 ? d.clone().multiplyScalar(t).add(camera).length() : Infinity;
+      const front = near > r * 0.985;
       const v = (this.base.get(l) ?? l.visible) && front;
       if (v !== l.visible) {
         l.visible = v;

@@ -17,7 +17,8 @@ export type ViewId =
   | 'current'
   | 'quake'
   | 'tsunami'
-  | 'volcano';
+  | 'volcano'
+  | 'aurora';
 
 /** 表示の切りかえ (ボタン 1 つ) */
 export interface Toggle {

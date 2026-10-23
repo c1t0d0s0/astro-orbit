@@ -3,6 +3,7 @@ import { getSettings, markSeen, saveSettings } from '../core/storage';
 import { placeById, type NamedPlace } from '../data/places';
 import { resolveWhen, type Guide } from '../guides';
 import { Stage } from '../three/stage';
+import { AuroraView } from '../views/aurora';
 import { EclipseView } from '../views/eclipse';
 import { GroundView } from '../views/ground';
 import { MoonView } from '../views/moon';
@@ -70,6 +71,8 @@ function makeView(stage: Stage, id: ViewId): View {
       return new TsunamiView(stage);
     case 'volcano':
       return new VolcanoView(stage);
+    case 'aurora':
+      return new AuroraView(stage);
     default:
       return new SpaceView(stage, id);
   }

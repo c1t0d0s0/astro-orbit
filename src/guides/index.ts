@@ -1,4 +1,5 @@
 import { nextPhase, seasonPoint } from '../astro/events';
+import { aurora } from './aurora';
 import { clouds } from './clouds';
 import { eclipse } from './eclipse';
 import { moon } from './moon';
@@ -18,7 +19,7 @@ import type { Guide, When } from './types';
 
 export type { Guide, Step, When } from './types';
 
-export const GUIDES: readonly Guide[] = [seasons, sunpath, tropics, polar, moon, eclipse, stars, tide, clouds, storm, typhoon, rainbow, water, quake, volcano];
+export const GUIDES: readonly Guide[] = [seasons, sunpath, tropics, polar, moon, eclipse, stars, tide, clouds, storm, typhoon, rainbow, water, quake, volcano, aurora];
 
 export const guideById = (id: string) => GUIDES.find((g) => g.id === id);
 

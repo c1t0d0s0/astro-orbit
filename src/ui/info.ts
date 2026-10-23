@@ -3,6 +3,7 @@ import { eclipseAt, nextEclipse, sunCovered, topocentricMoon, type Eclipse, type
 import { dayInfo, moonAge, moonRiseSet, nextPhase, type MoonPhase } from '../astro/events';
 import { bodiesAt } from '../astro/state';
 import { tideName, tideRange } from '../astro/tide';
+import { auroraSky, geomagLat, ovalGap } from '../earth/aurora';
 import type { ViewContext, ViewId } from '../views/types';
 import { beamChart, daylightChart, tideChart } from './chart';
 import { h, rubyHtml } from './dom';
@@ -165,6 +166,7 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
           ['月(つき)', moon.alt > -1 ? `${direction(moon.az)}の空(そら)、高(たか)さ ${deg(moon.alt)}` : '地平線(ちへいせん)の下(した)'],
           ...moonRows(ms, ctx),
           ...groundEclipse(ms, ctx, lst, sun.alt, moon.alt),
+          ...(ctx.options.aurora ? [auroraRow(ctx, sun.alt)] : []),
         ]) +
         figure('いまの太陽(たいよう)の光(ひかり)の当(あ)たり方(かた)', beamChart(sun.alt))
       );
@@ -194,6 +196,15 @@ export function infoHtml(view: ViewId, ms: number, ctx: ViewContext): string {
      default:
       return '';
   }
+}
+
+/** 地上から見たオーロラ (表示の切りかえ「オーロラ」が入っているとき) */
+function auroraRow(ctx: ViewContext, sunAlt: number): Row {
+  const m = geomagLat(ctx.place.lat, ctx.place.lon);
+  const sky = auroraSky(m, sunAlt, false);
+  const toward = m >= 0 === ovalGap(m, false) > 0 ? '北(きた)' : '南(みなみ)';
+  const where = sky === 'overhead' ? '頭(あたま)の上(うえ)の空(そら)に見(み)える' : sky === 'low' ? `${toward}の低(ひく)い空(そら)に見(み)える` : sunAlt > -10 ? '空(そら)が明(あか)るくて見(み)えない' : 'この場所(ばしょ)からは見(み)えない (オーロラの輪(わ)から遠(とお)い)';
+  return ['オーロラ', `${where} (地磁気緯度(ちじききど) ${Math.abs(m).toFixed(0)}°)`];
 }
 
 /** 地上から見た日食・月食 (起きているときだけ) */

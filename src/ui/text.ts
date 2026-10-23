@@ -189,9 +189,18 @@ export const VIEWS: Record<ViewId, ViewMeta> = {
     timeline: { length: 86_400_000, speeds: ['min', 'hour'] },
     note: '形(かたち)のちがいがわかるように、大(おお)きさをそろえてならべています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
   },
+  aurora: {
+    group: 'space',
+    title: 'オーロラ',
+    lead: '太陽(たいよう)からふいてくるつぶ (太陽風(たいようふう)) が、地球(ちきゅう)の磁場(じば)にみちびかれて、北極(ほっきょく)や南極(なんきょく)のまわりの空(そら)を光(ひか)らせます。',
+    span: 'day',
+    speed: 'min',
+    camera: 'space',
+    note: '地球(ちきゅう)のまわりの磁場(じば)やオーロラの高(たか)さは、見(み)やすく縮(ちぢ)めたり強調(きょうちょう)したりしています。ドラッグで回(まわ)す・2本指(ほんゆび)やホイールで拡大(かくだい)',
+  },
 };
 
-export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide', 'cloud', 'storm', 'typhoon', 'rainbow', 'river', 'current', 'quake', 'tsunami', 'volcano'];
+export const VIEW_ORDER: readonly ViewId[] = ['space', 'seasons', 'ground', 'polar', 'moon', 'eclipse', 'tide', 'cloud', 'storm', 'typhoon', 'rainbow', 'river', 'current', 'quake', 'tsunami', 'volcano', 'aurora'];
 
 export const SPAN_LABEL: Record<Span, string> = { day: '1日(にち)', month: '1か月(げつ)', year: '1年(ねん)' };
 

@@ -22,5 +22,6 @@ export const VIEW_ICON: Record<ViewId, string> = {
   quake: svg(`<path class="i-rock" d="M2 22H46V44H2Z"/><path class="i-plate" d="M28 22H46V30L28 40Z"/><path class="i-ground" d="M2 22H28"/><circle class="i-wave-p" cx="27" cy="30" r="12"/><circle class="i-wave-s" cx="27" cy="30" r="7"/><circle class="i-magma" cx="27" cy="30" r="2"/>`),
   tsunami: svg(`<path class="i-rock" d="M2 30Q14 30 22 40L46 42V46H2Z"/><path class="i-sea" d="M2 24H46V42L22 40Q14 30 2 30Z"/><path class="i-water" d="M2 24H14Q20 24 22 15Q24 24 30 24H46"/>`),
   volcano: svg(`<path class="i-ash" d="M22 10a6 5 0 0 1 9-3a5 5 0 0 1 8 4a4 4 0 0 1-2 7H24a4 4 0 0 1-2-8Z"/><path class="i-rock" d="M2 42L19 20H29L46 42Z"/><path class="i-magma" d="M22 20H26L27 42H21Z"/><line class="i-ground" x1="2" y1="42" x2="46" y2="42"/>`),
+  aurora: svg(`<circle class="i-earth" cx="24" cy="30" r="12"/><path class="i-field" d="M24 18C6 10 6 44 24 42M24 18C42 10 42 44 24 42"/><ellipse class="i-aurora" cx="24" cy="20" rx="6" ry="1.8"/><circle class="i-sun" cx="6" cy="8" r="4"/><path class="i-path" d="M11 9l5 2M10 13l5 1"/>`),
   tide: svg(`<ellipse class="i-sea" cx="20" cy="24" rx="15" ry="11"/>${earth(20, 24, 8)}<circle class="i-moon" cx="43" cy="24" r="3"/>`),
 };
