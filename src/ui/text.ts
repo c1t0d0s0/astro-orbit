@@ -270,8 +270,10 @@ export function elapsedLabel(ms: number, length: number): string {
   if (length <= 3_600_000) return sec < 60 ? `${sec}秒` : `${Math.floor(sec / 60)}分${String(sec % 60).padStart(2, '0')}秒`;
   const min = Math.floor(sec / 60);
   if (length <= 3 * 86_400_000) return min < 60 ? `${min}分` : `${Math.floor(min / 60)}時間${String(min % 60).padStart(2, '0')}分`;
+  // 桁数が変わって幅がガタつかないよう、U+2007 で桁をそろえる (digitsHtml で見えない 0 になる)
   const hour = Math.floor(min / 60);
-  return `${Math.floor(hour / 24)}日と${hour % 24}時間`;
+  const days = String(Math.floor(hour / 24)).padStart(String(Math.floor(length / 86_400_000)).length, '\u2007');
+  return `${days}日と${String(hour % 24).padStart(2, '\u2007')}時間`;
 }
 
 /** スライダーの目盛りの「30秒」「1.5時間」「5日」 */

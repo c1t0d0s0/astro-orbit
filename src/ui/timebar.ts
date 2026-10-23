@@ -1,7 +1,7 @@
 import { nextPhase, seasonPoint, type MoonPhase, type SeasonPoint } from '../astro/events';
 import { DAY_MS } from '../astro/time';
 import { SPEEDS, spanWindow, speedByKey, type Clock, type Span } from '../core/clock';
-import { h, rubyHtml } from './dom';
+import { digitsHtml, h, rubyHtml } from './dom';
 import { SPAN_LABEL, dateTimeLabel, elapsedLabel, elapsedTick, type Timeline } from './text';
 
 // タイムラプスの操作: 日付と時刻、スライダー、再生・一時停止、速さ、範囲 (1 日・1 か月・1 年)、「いま」、ジャンプ。
@@ -147,7 +147,7 @@ export function timebar(opts: TimebarOptions): Timebar {
     }
     const label = timeline ? { date: 'はじまりから', time: elapsedLabel(clock.ms, timeline.length) } : dateTimeLabel(clock.ms, opts.tz());
     if (label.date !== lastDate) date.textContent = lastDate = label.date;
-    if (label.time !== lastTime) time.textContent = lastTime = label.time;
+    if (label.time !== lastTime) time.innerHTML = digitsHtml((lastTime = label.time));
     slider.value = String(Math.round(Math.min(1, (clock.ms - win.start) / win.length) * STEPS));
     play.textContent = clock.playing ? '❚❚' : '▶';
     play.setAttribute('aria-label', clock.playing ? '一時停止' : '再生');

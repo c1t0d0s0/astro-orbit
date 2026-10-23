@@ -30,9 +30,12 @@ export function setRuby(on: boolean): void {
   showRuby = on;
 }
 
+/** 桁そろえの U+2007 を、数字と同じ幅の見えない 0 にした HTML (フォントに U+2007 がなくても幅がそろう) */
+export const digitsHtml = (text: string) => escapeHtml(text).replace(/\u2007/g, '<span class="digit-pad">0</span>');
+
 /** 「漢字(かんじ)」をふりがな付きの HTML にする。ふりがなを付けないときは、よみを消す */
 export function rubyHtml(text: string): string {
-  return escapeHtml(text).replace(/([一-龠々ヶ]+)\(([ぁ-ん]+)\)/g, showRuby ? '<ruby>$1<rt>$2</rt></ruby>' : '$1');
+  return digitsHtml(text).replace(/([一-龠々ヶ]+)\(([ぁ-ん]+)\)/g, showRuby ? '<ruby>$1<rt>$2</rt></ruby>' : '$1');
 }
 
 /** ふりがなのよみを消した文 (aria-label や title などに使う) */

@@ -1057,6 +1057,11 @@ rt {
 .info-rows dd {
   margin: 0;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.digit-pad {
+  visibility: hidden;
 }
 
 .info-fig {
