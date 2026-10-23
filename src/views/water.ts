@@ -15,11 +15,8 @@ import { sstTexture, tangents } from './weather';
 
 const HOUR = 3600;
 const X0 = -11.5;
-const X1 = 10.9;
-/** 三角州: 河口の少し手前 (DELTA) を頂点に、海へ扇形に広がる */
-const DELTA: [number, number] = [8.2, riverZ(8.2)];
-const DELTA_R = 2.6;
-const DELTA_ANGLE = 0.8;
+/** ふつうの海岸線の x */
+const COAST = 8.4;
 
 /** 川の中心の z (x の場所で)。河口から先はまっすぐ海へ出る */
 export function riverZ(x: number): number {
@@ -42,6 +39,25 @@ export function flood(t: number): number {
   return smooth(8 * HOUR, 20 * HOUR, t) * (1 - smooth(22 * HOUR, 40 * HOUR, t));
 }
 
+// 三角州: 河口で積もった砂やどろが、海岸線を海へ丸く押し出している。
+// 川は三角州の上で 3 本に分かれ、それぞれの河口の先が少し張り出す
+const DELTA_Z = riverZ(9.1);
+const MOUTHS = [DELTA_Z - 1.25, DELTA_Z, DELTA_Z + 1.25];
+
+/** 海岸線の x (z の場所で) */
+function coastX(z: number): number {
+  const lobes = MOUTHS.reduce((a, zm) => a + 0.28 * Math.exp(-(((z - zm) / 0.4) ** 2)), 0);
+  return COAST + 1.7 * Math.exp(-(((z - DELTA_Z) / 1.6) ** 2)) + lobes;
+}
+
+/** 海岸線までの (おおよその) 距離。海の中が +、陸が − */
+function coastDist(x: number, z: number): number {
+  const slope = (coastX(z + 0.01) - coastX(z - 0.01)) / 0.02;
+  return (x - coastX(z)) / Math.hypot(1, slope);
+}
+
+const X1 = coastX(DELTA_Z) + 0.05;
+
 /** 土地の高さ */
 function landHeight(x: number, z: number): number {
   const zc = riverZ(x);
@@ -58,30 +74,14 @@ function landHeight(x: number, z: number): number {
   const fan = Math.max(0, 0.9 - r * 0.22);
   let h = Math.max(plain, fan);
   if (x > -5 && x < -4.2) h = Math.max(h, 0.9 + (-4.2 - x) * 0.2 * (1 + Math.abs(z) * 0.5));
-  // 川の流れるところは少し低い
+  // 海岸の近くは海面より少し高い平らな土地 (三角州)
+  const c = coastDist(x, z);
+  if (x > 7.5) h = Math.max(h, 0.025 + 0.025 * Math.min(1, -c * 1.5));
+  // 川の流れるところは少し低い (三角州の上では浅い)
   const w = 0.2 + 0.25 * smooth(-5, 6, x);
-  h -= 0.1 * Math.max(0, 1 - d / (w * 1.6));
-  // 海と三角州
-  if (x > 8.4) {
-    const sea = 0.04 - (x - 8.4) * 0.22;
-    const e = deltaEdge(x, z);
-    return e > 0 ? Math.max(sea, 0.015 + 0.035 * Math.min(1, e * 5)) : sea;
-  }
-  return h;
-}
-
-/** 三角州のふち (外の境目まで) の距離 (0〜1)。外がわは 0 以下 */
-function deltaEdge(x: number, z: number): number {
-  const dx = x - DELTA[0];
-  const dz = z - DELTA[1];
-  const ang = Math.atan2(dz, dx);
-  const r = Math.hypot(dx, dz) / deltaFront(ang);
-  return Math.min(1 - r, (DELTA_ANGLE - Math.abs(ang)) * 1.5);
-}
-
-/** 三角州の先の、頂点からの距離 (分かれた川の先が少し張り出す) */
-function deltaFront(ang: number): number {
-  return DELTA_R * (1 + 0.07 * Math.cos(ang * 7.5));
+  h -= 0.1 * (1 - 0.8 * smooth(8, 9, x)) * Math.max(0, 1 - d / (w * 1.6));
+  // 海: 岸からゆるやかに深くなる
+  return c > 0 ? 0.025 - c * 0.2 : h;
 }
 
 function landColor(x: number, z: number, y: number, out: THREE.Color): void {
@@ -90,9 +90,11 @@ function landColor(x: number, z: number, y: number, out: THREE.Color): void {
   if (y < 0) out.setHex(0xc9b48a).lerp(new THREE.Color(0x3d6f9f), Math.min(1, -y * 3));
   else if (x < -5) out.setHex(0x4f7d43).lerp(new THREE.Color(0x8a7356), Math.min(1, near < 0.8 ? 0.7 : 0.15));
   else if (Math.hypot(x + 5, z * 1.1) < 3.6) out.setHex(0xa49a6a);
-  else if (deltaEdge(x, z) > 0) out.setHex(0xc4bb7c);
-  else if (x > 8.3) out.setHex(0xe0d0a2);
-  else out.setHex(0x78a65a);
+  else {
+    // 平地は緑、三角州は砂やどろの色、波打ちぎわは砂浜
+    out.setHex(0x78a65a).lerp(new THREE.Color(0xc4b87e), smooth(8.0, 9.0, x));
+    out.lerp(new THREE.Color(0xe0d0a2), smooth(-0.2, 0, coastDist(x, z)));
+  }
   // 川原 (石や砂が積もったところ)
   if (y >= 0 && near < 0.55 && x > -5) out.lerp(new THREE.Color(0xd8cba6), 0.55);
 }
@@ -197,18 +199,19 @@ export class RiverView implements View {
     lake.position.set(5.2, landHeight(5.2, -2.6) + 0.02, -2.6);
     root.add(lake);
 
-    // 三角州の上で分かれた川 (まん中は本流)
-    for (const side of [-1, 1]) {
+    // 三角州の上で分かれた川 (まん中は本流)。本流から分かれ、ゆるく曲がってそれぞれの河口へ
+    for (const zm of [MOUTHS[0], MOUTHS[2]]) {
+      const f = new THREE.Vector2(8.7, riverZ(8.7));
+      const m = new THREE.Vector2(coastX(zm) + 0.05, zm);
+      const k = new THREE.Vector2(f.x + 0.5, f.y + (zm - f.y) * 0.75);
       const pts: THREE.Vector3[] = [];
       for (let s = 0; s <= 24; s++) {
         const u = s / 24;
-        const ang = side * (0.12 + 0.42 * u);
-        const r = 0.3 + (deltaFront(side * 0.54) + 0.1 - 0.3) * u;
-        const x = DELTA[0] + r * Math.cos(ang);
-        const z = DELTA[1] + r * Math.sin(ang);
+        const x = (1 - u) ** 2 * f.x + 2 * u * (1 - u) * k.x + u * u * m.x;
+        const z = (1 - u) ** 2 * f.y + 2 * u * (1 - u) * k.y + u * u * m.y;
         pts.push(new THREE.Vector3(x, Math.max(landHeight(x, z) + 0.03, 0.012), z));
       }
-      root.add(ribbon(pts, 0.16, 0.28, 0x3d8ee0));
+      root.add(ribbon(pts, 0.12, 0.2, 0x3d8ee0));
     }
 
     this.flow = new Particles(FLOW_N, 0.16, { opacity: 0.95 });
@@ -240,7 +243,7 @@ export class RiverView implements View {
     this.labels.add(root, 'V字谷(じこく)', [-9, 2.4, riverZ(-9)]);
     this.labels.add(root, '扇状地(せんじょうち)', [-3.6, 1.2, 1.4]);
     this.labels.add(root, '三日月湖(みかづきこ)', [5.2, 0.7, -2.6], 'is-small');
-    this.labels.add(root, '三角州(さんかくす)', [9.4, 0.25, DELTA[1] + 1.4]);
+    this.labels.add(root, '三角州(さんかくす)', [9.3, 0.3, DELTA_Z - 0.7]);
     this.labels.add(root, '海(うみ)', [11, 0.4, -4]);
     this.labels.add(root, '上流(じょうりゅう)', [-9, 4.6, -4], 'is-small');
     this.labels.add(root, '中流(ちゅうりゅう)', [-1, 1.6, -4], 'is-small');
@@ -260,7 +263,8 @@ export class RiverView implements View {
   }
 
   private width(x: number, f: number): number {
-    return (0.12 + 0.28 * smooth(-6, 8, x)) * (1 + 1.6 * f);
+    // 三角州の上では 3 本に分かれるので、本流は細くなる
+    return (0.12 + 0.28 * smooth(-6, 8, x)) * (1 - 0.45 * smooth(8.5, 9.2, x)) * (1 + 1.6 * f);
   }
 
   update(ms: number, ctx: ViewContext): void {
